@@ -28,7 +28,7 @@ lib/vk.ml: bin/libgen spec/vk.xml
 
 vk:  spec/vk.xml lib/vk.ml
 	cp lib_aux/*.ml lib
-	$(DUNE) @install
+	$(DUNE) --release @install
 
 shaders/%/frag.spv : shaders/%/base.frag
 	cd shaders/$* && $(SPIR) base.frag
