@@ -1,3 +1,4 @@
+SHELL=/bin/bash
 CC=ocamlbuild
 CCO=$(CC) -use-ocamlfind -use-menhir
 DUNE=dune build
