@@ -1,6 +1,6 @@
 DUNE=dune build
 SPIR=glslangValidator -V
-SPECREF=v1.2.162
+SPECREF=v1.2.166
 
 .PHONY: lib clean vkspec
 
