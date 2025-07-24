@@ -296,7 +296,12 @@ let set types typ r field value =
   let name = varname % fst and ty = snd in
   let array_len (_, ty as _index) =
     ty_of_int types ty (array_len value.e) in
-  let optzero f = if Inspect.is_option (ty f) then [%expr None] else [%expr 0] in
+  let optzero (_, ty) =
+    if Inspect.is_option ty then [%expr None]
+    else match ty with
+      | Name { prefix = []; main = ["size"; "t"]; postfix = [] } -> [%expr Vk__builtin__types.Size_t.zero]
+      | _ -> [%expr 0]
+  in
   let setf f x = setf r f x in
   match field with
   | Ty.Simple(f, (Ptr Name t | Const Ptr Name t)) when Inspect.is_record types t ->
