@@ -23,11 +23,13 @@ let enum n: Structured_extensions.enum =
       } in
   { extend = n%("extends");
     name = n%("name");
-    info;
+    constr = Value { info };
+    xml = n;
   }
 let bit n = { extend = n%("extends");
-              pos = int_of_string @@ n%("bitpos");
-              name = n%("name") }
+              constr = Bit { pos = int_of_string @@ n%("bitpos") };
+              name = n%("name");
+              xml = n }
 
 let promoted_data x aliases = match x with
   | Xml.Data _ -> errorf "Extension data: unexpected raw data"
@@ -44,7 +46,7 @@ let data (type a) x (ext: a data) = match x with
     | "type" -> { ext with types = etype n :: ext.types }
     | "command" -> { ext with commands = command n :: ext.commands }
     | "enum" when n%??"bitpos" ->
-      { ext with bits = bit n :: ext.bits }
+      { ext with enums = bit n :: ext.enums }
     | "enum" when n%??"extends"  && (n%??"offset" || n%??"value") ->
       { ext with enums = enum n :: ext.enums }
     | "enum" when n%??"name" -> (* constants *) ext
@@ -98,9 +100,7 @@ let extension (type a) (meta: _ -> _ -> a * _) = function
     let all_children = extension_requires children in
     (* TODO: analyze correctly requirements *)
     let metadata, q = meta n all_children in
-    let start =
-      { metadata; types = []; commands = []; enums = [];
-        bits = [] } in
+    let start = { metadata; types = []; commands = []; enums = [] } in
     List.fold_right data q start
   | Node { name; _ } as n ->
     Fmt.epr "@[<hov>%a@]@." Xml.pp_xml n;
