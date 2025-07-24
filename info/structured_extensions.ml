@@ -12,10 +12,12 @@ type info =
  | Third_party of { offset:int; upward:bool; extension_number: int option }
  | Core of int
 
-type enum =
-  { extend:string; name:string; info: info }
+type constr =
+  | Value of { info: info }
+  | Bit of { pos:int }
 
-type bit = { extend:string; name:string; pos:int}
+type enum =
+  { extend:string; name:string; constr:constr; xml:Xml.node }
 
 type 'a data =
   {
@@ -23,7 +25,6 @@ type 'a data =
     types: string list;
     commands: string list;
     enums: enum list;
-    bits: bit list;
   }
 
 
@@ -56,24 +57,20 @@ let pp_enum ppf (e:enum)=
       ext.offset ext.upward
   | Core n ->
     Fmt.pf ppf "Core %d" n in
+  let pp_constr ppf = function
+    | Value { info } -> pp_info ppf info
+    | Bit { pos } -> Fmt.pf ppf "pos=%d" pos in
   Fmt.pf ppf
-    "@[<hov>{name=%s;@ extend=%s;@ info=%aa}@]"
-      e.name e.extend pp_info e.info
-
-let pp_bit ppf (b:bit)=
-  Fmt.pf ppf
-    "@[<hov>{name=%s;@ extend=%s;@ pos=%d;}@]"
-    b.name b.extend b.pos
+    "@[<hov>{name=%s;@ extend=%s;@ info=%a}@]"
+      e.name e.extend pp_constr e.constr
 
 let pp_active ppf (t:t) =
   Fmt.pf ppf
-    "@[<v 2>{metadata=%a;@;types=[%a];@;commands=[%a];@;enums=[%a];@;\
-     bits=[%a]@ }@]"
+    "@[<v 2>{metadata=%a;@;types=[%a];@;commands=[%a];@;enums=[%a];@ }@]"
     pp_metadata t.metadata
     Fmt.(list string) t.types
     Fmt.(list string) t.commands
     (Fmt.list pp_enum) t.enums
-    (Fmt.list pp_bit) t.bits
 
 let pp ppf = function
   | Active t ->
@@ -93,67 +90,74 @@ module Extend = struct
       List.fold_left add all
   end
 
- module IntMap = Map.Make(Int)
-  let decorate_enum = function
-    | Refined_types.Ty.Enum constrs ->
-      let add' (b,emap) = function
-        | _, T.Abs n as constr ->
-          Bound.add b n,
-          IntMap.add n constr emap
-        | _ -> b, emap in
-      List.fold_left add' (Bound.all,IntMap.empty) constrs
-    | x -> Fmt.failwith "Expected parent enum, but found: %a" Refined_types.Ty.pp_def x
+  module IntMap = Map.Make(Int)
+
+  type enum_or_bit =
+    | Values of (Bound.t * (string * T.pos) IntMap.t)
+    | Bitfield of ((string * int) list * (string * int) list)
+
+  let decorate_enum constrs =
+    let add' (b,emap) = function
+      | _, T.Abs n as constr ->
+        Bound.add b n,
+        IntMap.add n constr emap
+      | _ -> b, emap in
+    Values (List.fold_left add' (Bound.all,IntMap.empty) constrs)
 
 
-  let find decorate m0 x m =
+  let find m0 x m =
     try N.find x m with
     | Not_found ->
       match N.find x m0 with
-      | Entity.Type ty -> decorate ty
+      | Entity.Type Bitfields x -> Bitfield (x.fields, x.values)
+      | Entity.Type Enum constrs -> decorate_enum constrs
+      | Entity.Type x -> Fmt.failwith "Expected parent enum or bitfield, but found: %a" Refined_types.Ty.pp_def x
       | _ -> raise Not_found
 
 
   let enum extension_number m0 =
-    let find = find decorate_enum m0 in
+    let find = find m0 in
     let add m (x:enum) =
-      let key = x.extend in
-      let b, emap = find key m  in
-      let abs =
-        match x.info with
-        | Core n -> n
-        | Third_party ext ->
-          let extension_number =
-            C.Option.merge_exn  ext.extension_number extension_number in
-          let pos = (1000000 + extension_number - 1) * 1000 + ext.offset in
-          if ext.upward then +pos else -pos in
-      let elt = Bound.add b abs, IntMap.add abs (x.name, T.Abs abs) emap in
-      N.add key elt m in
-    List.fold_left add N.empty
-
-  let bit m0 =
-    let proj = function
-      | T.Ty.Bitfields x -> x.fields, x.values
-      | _ -> raise Not_found in
-    let find = find proj m0 in
-    let add m (x:bit) =
-      let key = x.extend in
-      let fields, vals = find key m in
-      let l = (x.name, x.pos) :: fields, vals in
-      N.add key l m in
+      try
+        let key = x.extend in
+        match find key m, x.constr with
+        | Bitfield (fields, vals), Bit { pos } ->
+          let l = (x.name, pos) :: fields, vals in
+          N.add key (Bitfield l) m
+        | Bitfield (fields, vals), Value { info = Core v } ->
+          let l = fields, (x.name, v) :: vals in
+          N.add key (Bitfield l) m
+        | Values (b, emap), Value { info } ->
+          let abs =
+            match info with
+            | Core n -> n
+            | Third_party ext ->
+              let extension_number =
+                C.Option.merge_exn  ext.extension_number extension_number in
+              let pos = (1000000 + extension_number - 1) * 1000 + ext.offset in
+              if ext.upward then +pos else -pos in
+          let elt = Bound.add b abs, IntMap.add abs (x.name, T.Abs abs) emap in
+          N.add key (Values elt) m
+        | _ ->
+          failwith "Unexpected extension combination"
+        with Failure m ->
+          let bt = Printexc.get_raw_backtrace () in
+          let m = Fmt.str "@[<hv>%s@; at %a@]" m Xml.pp_node_loc x.xml in
+          Printexc.raise_with_backtrace (Failure m) bt
+    in
     List.fold_left add N.empty
 
   let extend number m ext =
     let ext_num = number ext in
-    let bits = bit m ext.bits in
     let enums = enum ext_num m ext.enums in
     let list emap = List.map snd (IntMap.bindings emap) in
-    let rebuild_enum key (_,emap) =
-      N.add key (Entity.Type(T.Ty.Enum (list emap))) in
-    let rebuild_set key (fields,values) =
-      N.add key (Entity.Type(T.Ty.Bitfields { fields; values })) in
+    let rebuild_enum key = function
+      | Values (_,emap) ->
+        N.add key (Entity.Type(T.Ty.Enum (list emap)))
+      | Bitfield (fields,values) ->
+        N.add key (Entity.Type(T.Ty.Bitfields { fields; values })) in
     m
     |> N.fold rebuild_enum enums
-    |> N.fold rebuild_set bits
 
   let all_exts m exts =
     let number x = Some x.metadata.number in
