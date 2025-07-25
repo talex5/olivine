@@ -74,8 +74,6 @@ let any _ = true
 let tokenize = String.split_on_char ' '
 
 
-let require_opt = Xml.find "requires"
-
 let is_prefix s s' =
   let exception X in
   try
@@ -320,8 +318,13 @@ let bitmask = with_aliases @@ fun spec node ->
   let ty =
     match ty with
     | Ty.(Alias (Name n)) ->
-      Ty.Bitset { implementation=n;
-                  field_type = node%?("requires") }
+      let field_type =
+        (* Not sure what the difference is between these. *)
+        match node%?("bitvalues") with
+        | Some _ as x -> x
+        | None -> node%?("requires")
+      in
+      Ty.Bitset { implementation=n; field_type }
     | _ -> type_errorf "Bitmask expected" in
   register name (Type ty) spec
 
