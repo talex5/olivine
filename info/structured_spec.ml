@@ -368,7 +368,10 @@ let require spec node =
   let r =
     { from = node%("requires");
       type_name = node%("name") }  in
-  { spec with requires = r :: spec.requires }
+  let aliases =
+    if r.from = "vk_platform" then spec.aliases
+    else N.add r.type_name "void" spec.aliases in
+  { spec with requires = r :: spec.requires; aliases }
 
 
 let types spec node =
@@ -595,7 +598,7 @@ let typecheck tree =
     includes = [];
     requires = [];
     extensions = [];
-    aliases = N.empty
+    aliases = N.empty;
   } tree
 
 let fp = Fmt.pf
