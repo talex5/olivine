@@ -150,7 +150,7 @@ let rec ptr_to_name ?(ellide=true) = function
     @@ ptr_to_name ~ellide:false p
   | _ -> None
 
-let nullptr_typ p = [%expr nullptr [%e p]]
+let nullptr_typ p = [%expr Vk__helpers.nullptr [%e p]]
 let allocate_n ty n = [%expr Ctypes.allocate_n [%e ty] [%e n]]
 let allocate ty value = [%expr Ctypes.allocate [%e ty] [%e value]]
 
@@ -190,6 +190,7 @@ let allocate_field types fields vars f body  =
         [%expr let [%p f.p] = [%e alloc] in [%e body] ]
     end
   | Array_f { array=a, Option _; index=i, Ptr Option Name t } ->
+    (* Array is optional and so is the index's value. Just pass None for both. *)
     let a = get a and i = get i in
     let name = Inspect.prefix varpath types t
         ~name:(L.simple ["ctype";"opt"]) in
@@ -199,6 +200,7 @@ let allocate_field types fields vars f body  =
       let [%p a.p] = None in [%e body]
     ]
   | Array_f { array=a, elt; index=i, size } ->
+    (* Otherwise, use calloc to zero out the size pointer. *)
     let a = get a and i = get i in
     begin match ptr_to_name elt, ptr_to_name size with
       | None, _ | _, None -> body
@@ -209,7 +211,7 @@ let allocate_field types fields vars f body  =
             (Type.converter types ~struct_field:false ~degraded:true e) in
         [%expr let [%p a.p] = [%e alloc_elt]
           and [%p i.p] = [%e alloc_size] in
-          body
+          [%e body]
         ]
     end
   | _ -> C.not_implemented "Native function for field type %a" Ty.pp_fn_field f
@@ -325,8 +327,8 @@ let join ty res outputs =
 let look_out vars output = List.fold_left ( fun (l,vars) f ->
     match f.Ty.field with
     | Ty.Array_f { array = a, _ ; index = i, _ } ->
-      let u = unique (varname a) and v = unique (varname i) in
-      u.e :: l, vars |> M.add (varname i) u |> M.add (varname a) v
+      let ua = unique (varname a) and ui = unique (varname i) in
+      ua.e :: l, vars |> M.add (varname i) ui |> M.add (varname a) ua
     | Simple(n, Array _ ) ->
       let u = unique (varname n) and v = unique "size" in
       u.e :: l, vars |> M.add (varname n) v |> M.add (varname @@ C.index_name n) u
