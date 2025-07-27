@@ -32,6 +32,8 @@ let uint_16_t = Ctypes.view ~read:(U16.to_int) ~write:(U16.of_int)
 type void = unit
 let void = Ctypes.void
 
+type int_8_t = int
+type int_16_t = int
 type int_32_t = int
 type bool_32 = bool
 
@@ -134,6 +136,33 @@ module Bool_32 = struct
   let zero = true
   let pp = Format.pp_print_bool
 end
+
+
+module Int_8_t = struct
+  let zero = 0
+  let of_int x = x
+  let to_int x = x
+  let to_string = string_of_int
+  let pp ppf x = Format.fprintf ppf "%d" x
+
+  type t = int
+  let ctype = Ctypes.int8_t
+  let ctype_opt = integer_opt' zero ctype
+end
+
+
+module Int_16_t = struct
+  let zero = 0
+  let of_int x = x
+  let to_int x = x
+  let to_string = string_of_int
+  let pp ppf x = Format.fprintf ppf "%d" x
+
+  type t = int
+  let ctype = Ctypes.int16_t
+  let ctype_opt = integer_opt' zero ctype
+end
+
 
 module Int_32_t = struct
   let zero = 0
