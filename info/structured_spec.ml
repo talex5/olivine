@@ -125,7 +125,7 @@ let len_path s =
         List.rev prevs
     else
       match s.[curr] with
-      | 'a'..'z' | 'A'..'Z' -> segm prevs start (curr+1)
+      | 'a'..'z' | 'A'..'Z' | '0'..'9' -> segm prevs start (curr+1)
       | '-' ->
         segm ((sub start curr)::prevs) (curr+2) (curr+3)
       | ':' ->
