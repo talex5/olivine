@@ -48,8 +48,8 @@ rule start = parse
  | digit+ as d 'L'?{ INT(int_of_string d)  }
  | digit+ as d 'U' 'L'? { UINT( Unsigned.UInt.of_string d)  }
  | digit+ as d 'U' 'L' 'L' { UINT64( Unsigned.ULLong.of_string d)  }
- | digit+ as d "f"  { FLOAT(float @@ int_of_string d) }
- | digit+ "." digit* as f "f"? { FLOAT(float_of_string f) }
+ | digit+ as d ("f" | "F")  { FLOAT(float @@ int_of_string d) }
+ | digit+ "." digit* as f ("f" | "F")? { FLOAT(float_of_string f) }
  | space+ {start lexbuf}
  | newline+  { start lexbuf }
  | idstart idmid* as d { IDENTIFIER d }
