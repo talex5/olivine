@@ -314,6 +314,7 @@ let escape = function
   | ["false" ] -> [ "false'" ]
   | ["true" ] -> [ "true'" ]
   | ["inherit"] -> ["inherit'"]
+  | ["function"] -> ["function'"]
   | s :: q -> escape_word s ::  q
   | p -> p
 
