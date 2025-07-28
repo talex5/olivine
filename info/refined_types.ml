@@ -169,11 +169,6 @@ module Typexpr(X:name) = struct
   and field =
     | Simple of simple_field
     | Array_f of { index: simple_field; array: simple_field }
-    | Record_extension of
-        { exts: name list;
-          tag:simple_field;
-          ptr:simple_field
-        }
   and fn_field = { dir:direction; field:field }
   and fn = { original_name:string; name:name; return: typexpr; args: fn_field list }
 
@@ -182,13 +177,11 @@ module Typexpr(X:name) = struct
   let field_to_type  = function
     | Array_f { array=_n, ty; _ } -> ty
     | Simple(_n,ty) -> ty
-    | Record_extension _ -> failwith "Not implemented: typ for record_extension"
 
   let flatten_fields l =
     let f acc = function
       | Simple f -> f :: acc
       | Array_f {index; array } -> array :: index :: acc
-      | Record_extension {tag;ptr; _ } -> ptr :: tag :: acc
     in
     List.rev @@ List.fold_left f [] l
 
@@ -201,7 +194,7 @@ module Typexpr(X:name) = struct
       | Array _ | Result _ -> false
       | _ -> true in
     let is_simple = function
-      | { dir = Out; _ } | { field = (Array_f _ | Record_extension _ ); _ } ->
+      | { dir = Out; _ } | { field = (Array_f _); _ } ->
         false
       | {field = Simple( _,  ty  ); _ } -> is_simple_ty ty in
     List.for_all is_simple fn.args && is_simple_ty fn.return
@@ -254,9 +247,6 @@ module Typexpr(X:name) = struct
     | Array_f {index;array} ->
       fp ppf "[{Array.index:%a; array:%a}@]"
         pp_simple_field index pp_simple_field array
-    | Record_extension {exts; _ } ->
-      fp ppf "[{Record extensions:%a}@]"
-        (Fmt.list X.pp) exts
 
   and pp_fn_field ppf f =
     fp ppf "⟨%a:%a⟩" pp_dir f.dir pp_field f.field
