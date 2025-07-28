@@ -83,8 +83,7 @@ let apply_gen ?attrs get name vars args =
   let add_arg l = function
     | Ty.Array_f { array ; index } ->
       (get array) :: (get index) :: l
-    | Simple field -> get field :: l
-    | Record_extension _  -> assert false in
+    | Simple field -> get field :: l in
   let args = List.rev @@ List.fold_left add_arg [] args in
   Exp.apply ?attrs name args
 
@@ -214,7 +213,6 @@ let allocate_field types fields vars f body  =
           [%e body]
         ]
     end
-  | _ -> C.not_implemented "Native function for field type %a" Ty.pp_fn_field f
 
 (* Array output parameter needs to be allocated in two times:
    first the index parameter is allocated,
@@ -305,8 +303,6 @@ let to_output types vars f =
   | Simple(n, Ptr Option _) ->
     unwrap [%expr (Ctypes.(!@) [%e get n]) ]
   | Simple(n, _) -> [%expr Ctypes.(!@) [%e get n] ]
-  | Record_extension _ ->
-    C.not_implemented "Record extension used as a function argument"
 
 let join ty res outputs =
   let n = List.length outputs in

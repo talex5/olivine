@@ -263,10 +263,6 @@ let fields_refine fields =
       | false -> refine (Ty.Simple(n,ty)::extended) q
       | true -> refine ( Simple(n, Option ty) :: extended) q
       end
-    | ("pNext", _  as ptr) :: ("sType", _ as tag) :: q ->
-      refine (Ty.Record_extension { tag; ptr; exts= [] } ::extended) q
-    | ("pNext", ty ) :: _ -> Fmt.failwith "pNext without sType: %a@." Ty.pp ty
-    | ("sType", ty) :: _ -> Fmt.failwith "sType without pNext: %a@." Ty.pp ty
     | (n,t) :: q -> refine (Ty.Simple(n,t)::extended) q
     | [] -> extended in
   refine [] fields

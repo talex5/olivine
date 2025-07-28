@@ -60,10 +60,7 @@ let mkfun fields =
         (label f @@ varname @@ C.repr_name f) opt p body in
     let vars = List.fold_left (fun m (k,x) -> M.add k x m) m in
     function
-    | Ty.Record_extension _ as f ->
-      let u = unique "ext" and opt = [%expr No_extension] in
-      def ~opt f u.p, vars ["ext", u]
-    | Array_f { array= n, _; index = i, _  } as f ->
+    | Ty.Array_f { array= n, _; index = i, _  } as f ->
       let u = unique (varname n) and v = unique (varname i) in
       def f u.p, vars [varname n, u; varname i, v ]
     | Simple(n, Array _) as f ->
@@ -121,8 +118,6 @@ let field types =
   function
   | Ty.Simple f -> sfield f ^:: nil
   | Array_f r -> sfield r.index ^:: sfield r.array ^:: nil
-  | Record_extension {tag; ptr; _ } ->
-    sfield tag ^:: sfield ptr ^:: nil
 
 let (#.) r x = [%expr Ctypes.getf [%e r] [%e x]]
 let (#%) r get = [%expr [%e get] [%e r] ]
@@ -220,13 +215,12 @@ let union types (n,ty) : (structure_item, signature_item) item =
     ]
     (val' n [%type: [%t Type.mk types ty] -> t ])
 
-let type_field types typename = function
+let type_field types _typename = function
   | Ty.Simple(_,ty) -> Type.mk types ty
   | Array_f { array = _, ty; index = _, ity }
     when Inspect.is_option ity && not (Inspect.is_option ty) ->
     [%type: [%t Type.mk types ty] option ]
   | Array_f { array = _, ty; _ } -> Type.mk types  ty
-  | Record_extension _ -> typ (Record_extension.name typename)
 
 let const x = varpath ~par:[L.simple["Vk__Const"]] x
 
@@ -268,10 +262,7 @@ let getter typename types fields field =
       count @ main
         [%expr let [%p (var n).p] = [%e get_field' n]
           and [%p xv.p] = [%e get_field' x] in [%e body] ]
-    | Record_extension {exts;tag=tag,_ ;ptr= ptr, _ } ->
-      main @@
-      Record_extension.merge (typename, exts) ~tag:(get_field' tag)
-        ~data:(get_field' ptr)
+    | f when Inspect.is_extension f -> []
     | Simple (n, (String | Option String as t)) ->
       let arg_type = Type.converter types ~degraded:false ~struct_field:false t in
       let field_type = Type.converter types ~degraded:false ~struct_field:true t in
@@ -320,7 +311,7 @@ let convert_string n s =
   [%expr Vk__helpers.convert_string [%e n] [%e s] ]
 
 
-let set types typ r field value =
+let set types _typ r field value =
   let name = varname % fst and ty = snd in
   let array_len (_, ty as _index) =
     ty_of_int types ty (array_len value.e) in
@@ -362,14 +353,6 @@ let set types typ r field value =
     [%expr
       [%e setf (name index) (array_len index)];
       [%e setf (name array) (start value.e) ]
-    ]
-  | Ty.Record_extension { exts; tag; ptr } ->
-    let split = Record_extension.split tag ptr (typ,exts) value.e in
-    [%expr
-      let type__gen, next__gen =
-        [%e split] in
-      [%e setf "s_type" [%expr type__gen] ];
-      [%e setf "next" [%expr next__gen] ]
     ]
 
 let rec printer types t =
@@ -419,8 +402,8 @@ let pp types fields =
           pf ppf "@[{@ "; [%e with_pf x] ]
       (val' ~:"pp"[%type: Format.formatter -> t -> unit])
   in
+  let arg_fields = List.filter (Fun.negate Inspect.is_extension) fields in
   let pp_field (field:Ty.field) = match field with
-    | Record_extension _ -> [%expr pf ppf "ext=⟨unsupported⟩"]
     | Array_f { array=name, (Ty.Ptr ty| Const Ptr ty | Array(_,ty));
                 index=_,tyi  } ->
       let opt x = if Inspect.is_option tyi then Ty.Option x else x in
@@ -431,7 +414,7 @@ let pp types fields =
       Fmt.epr "Structured.pp: %a@." Ty.pp ty; assert false
     | Simple f -> pp_f f in
   let sep = [%expr pf ppf ";@ "] in
-  def @@ [%expr [%e sseq sep pp_field fields]; pf ppf "@ }@]"]
+  def @@ [%expr [%e sseq sep pp_field arg_fields]; pf ppf "@ }@]"]
 
 
 let def_fields (type a) (typename, kind: _ * a kind) types (fields: a list) =
@@ -440,11 +423,7 @@ let def_fields (type a) (typename, kind: _ * a kind) types (fields: a list) =
   | Union -> module' inner (structure @@ imap (sfield types) fields) ^:: seal
   | Record ->
     let lens f = getter typename types fields f in
-    let exts= match Inspect.record_extension fields with
-      | Some exts -> Record_extension.def (typename,exts)
-      | None -> nil in
-    exts
-    @*  module' inner
+    module' inner
       (structure @@ List.fold_right (fun x l -> field types x @* l) fields nil)
     ^:: seal @* (fold_map lens fields) @* pp types fields ^:: nil
 
@@ -471,8 +450,8 @@ let def types (_,kind as tk) name fields =
   ^:: unsafe_make_i ^:: nil
 
 let keep_field_alive vars acc = function
+  | f when Inspect.is_extension f -> acc
   | Ty.Simple(f, _ ) | Array_f { index = _; array = (f, _) } -> ex (M.find @@ varname f) vars :: acc
-  | _ -> acc
 
 let array =
   reset_uid ();
@@ -494,9 +473,12 @@ let string_to_ptr types (vars : (pattern, expression) dual M.t) body = function
   | _ -> body
 
 let construct types tyname fields =
-  let fn, m = mkfun fields in
+  let arg_fields = List.filter (Fun.negate Inspect.is_extension) fields in
+  let fn, m = mkfun arg_fields in
   let res = unique "res" in
-  let set field = set types tyname res.e field
+  let set field =
+    if Inspect.is_extension field then setf res.e (varname (C.repr_name field)) (Record_extension.str tyname)
+    else set types tyname res.e field
       (M.find (varname @@ C.repr_name field) m) in
   let keep_alive =
     keep_alive (List.fold_left (keep_field_alive m) [] fields) res.e in
@@ -507,7 +489,7 @@ let construct types tyname fields =
   let strings body = List.fold_left (string_to_ptr types m) body fields in
   item [%stri let make = [%e fn (strings body)]]
     (val' ~:"make" @@
-     Type.fn types ~regular_struct:true ~with_label:true tyname fields [%type: t])
+     Type.fn types ~regular_struct:true ~with_label:true tyname arg_fields [%type: t])
 
 let raw = L.(~:"Raw")
 

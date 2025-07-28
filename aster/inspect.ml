@@ -16,8 +16,7 @@ let is_result_name x = L.to_path x = ["result"]
 let is_option_f = function
   | Ty.Simple (_, (Option _ | Const Option _) )
   | Ty.Array_f { index = _, (Option _  | Const Option _ ); _ }
-  | Ty.Array_f { array = _, (Option _ | Const Option _); _ }
-  | Ty.Record_extension _ -> true
+  | Ty.Array_f { array = _, (Option _ | Const Option _); _ } -> true
   | _ -> false
 
 let is_option = function
@@ -111,14 +110,8 @@ let is_result_def = function
 
 let is_extension =
   function
-  | Ty.Record_extension _ -> true
+  | Ty.Simple (_, Ty.Name {prefix = []; main = ["structure"; "type"]; postfix = []}) -> true
   | _ -> false
-
-let record_extension fields =
-  match List.find is_extension fields with
-  | exception Not_found -> None
-  | Ty.Record_extension {exts;_} ->  Some exts
-  | _ -> None
 
 let rec find_field_type name = function
   | [] -> None
