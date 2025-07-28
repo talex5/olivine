@@ -430,8 +430,8 @@ let ke (type a) (kind:a kind) = match kind with
   | Record -> [%expr Ctypes.structure]
 
 let def types (_,kind as tk) name fields =
-  hidden [%stri type mark ]
-  @* item [%stri type t = [%t kind_cstr kind [%type:mark] ] ] [%sigi: type t]
+  item [%stri type mark] [%sigi: type mark]
+  ^:: item [%stri type t = [%t kind_cstr kind [%type:mark] ] ] [%sigi: type t = [%t kind_cstr kind [%type:mark]]]
   ^:: item
     [%stri let view: t Ctypes.typ =
              [%e ke kind] [%e string @@ typestr name] ]
