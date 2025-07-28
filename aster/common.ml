@@ -67,7 +67,6 @@ let module_name name =
 let repr_name = function
   | Ty.Array_f { array = a, _ ; _ } -> a
   | Simple(n, _ ) -> n
-  | Record_extension _ -> ~:"ext"
 
 let index_name f = L.(f//"size'")
 

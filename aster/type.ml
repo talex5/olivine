@@ -142,11 +142,11 @@ let fn types
   let arg f = match f with
     | Ty.Array_f { array=n, ty; _ } ->
       label n f, mkty ty
-    | Simple(n,ty) as f ->
-      label n f , mkty ty
-    | Record_extension _ ->
+    | x when Inspect.is_extension x ->
       label ~:"ext" f ,
       typ types (Record_extension.name fname)
+    | Simple(n,ty) as f ->
+      label n f , mkty ty
   in
   let ret =
     if List.exists Inspect.is_option_f fields && with_label then
