@@ -395,7 +395,7 @@ let generate_subextension dict registry branch lib
       @@ ext.commands (*@ ext.types*) in
     let branch' = L.simple [branch] in
     let ext_m =
-      make ~args ~sig':( Module (mkforeign [] raw) ::
+      make ~args ~sig':( Module (make [] raw) ::
                         [Ast preambule])
         []  name in
     let lib = add [branch'] (Module ext_m) lib in
