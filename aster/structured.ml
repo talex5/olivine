@@ -430,8 +430,7 @@ let def types (_,kind as tk) name fields =
 let keep_field_alive vars acc = function
   (*  | Ty.Simple(_,Array _ ) -> acc *)
   | f when Inspect.is_extension f -> acc
-  | Ty.Simple(f, _ ) -> ex (M.find @@ varname f) vars :: acc
-  | _ -> acc
+  | Ty.Simple(f, _ ) | Array_f { index = _; array = (f, _) } -> ex (M.find @@ varname f) vars :: acc
 
 let array =
   reset_uid ();
