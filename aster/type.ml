@@ -29,11 +29,14 @@ let mult factor const =
     [%expr [%e int.e factor] * [%e const]]
 
 
-let rec converter types ~degraded x =
+(* [converter types ~degraded x] is a ctypes expression for type [x].
+   If [degraded = true] then arrays are always represented as pointers,
+   even if they have known size (used in function types). *)
+let rec converter types ~struct_field ~degraded x =
   let tyvar ?post = tyvar ?post types in
-  let make = converter types ~degraded in
+  let make ?(struct_field=false) = converter types ~struct_field ~degraded in
   match x with
-  | Ty.Const t -> make t
+  | Ty.Const t -> make ~struct_field t
   | Name n -> tyvar n
   | Ptr Name n | Ptr Const Name n ->
     [%expr Ctypes.ptr [%e tyvar n]]
@@ -45,9 +48,11 @@ let rec converter types ~degraded x =
   | Option Array (Some (Lit n) ,typ) when not degraded ->
     [%expr Vk__helpers.array_opt [%e int.e n ] [%e make typ ]]
   | Option Array (_,t) -> [%expr Ctypes.ptr_opt [%e make t]]
+  | Option String when struct_field -> [%expr Ctypes.ptr_opt Ctypes.char]
   | Option String -> [%expr Ctypes.string_opt]
   | Option Width { ty; _ } -> make (Option ty)
   | Option t -> Fmt.epr "Not implemented: option %a@." Ty.pp t; exit 2
+  | String when struct_field -> [%expr Ctypes.ptr Ctypes.char]
   | String -> [%expr Ctypes.string]
   | Array (Some Const {factor;name} ,typ) when not degraded ->
     [%expr Ctypes.array [%e mult factor (const_ident name)] [%e make typ]]
@@ -58,7 +63,7 @@ let rec converter types ~degraded x =
     Result.expr types (ok,bad)
   | FunPtr _ ->
     failwith "Not_implemented: funptr"
-  | Width tyw -> make tyw.ty
+  | Width tyw -> make ~struct_field tyw.ty
 
 
 type decay = All | Dyn_array | None

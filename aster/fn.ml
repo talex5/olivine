@@ -186,7 +186,7 @@ let allocate_field types fields vars f body  =
       | None -> body
       | Some (ty,_) ->
         let alloc = C.wrap_opt t @@ allocate_n
-            (Type.converter types ~degraded:true ty) [%expr 1] in
+            (Type.converter types ~degraded:true ~struct_field:false ty) [%expr 1] in
         [%expr let [%p f.p] = [%e alloc] in [%e body] ]
     end
   | Array_f { array=a, Option _; index=i, Ptr Option Name t } ->
@@ -204,9 +204,9 @@ let allocate_field types fields vars f body  =
       | None, _ | _, None -> body
       | Some (e,_), Some(s,_) ->
         let alloc_size = C.wrap_opt size @@ allocate_n
-            (Type.converter types ~degraded:true s) [%expr 1]
+            (Type.converter types ~struct_field:false ~degraded:true s) [%expr 1]
         and alloc_elt = nullptr_typ
-            (Type.converter types ~degraded:true e) in
+            (Type.converter types ~struct_field:false ~degraded:true e) in
         [%expr let [%p a.p] = [%e alloc_elt]
           and [%p i.p] = [%e alloc_size] in
           body
@@ -225,7 +225,7 @@ let secondary_allocate_field types vars f body = match f.Ty.field with
     begin match ptr_to_name tya with
       | Some (Option elt, _ ) ->
         let alloc = allocate_n
-            (Type.converter types ~degraded:true elt) size in
+            (Type.converter types ~struct_field:false ~degraded:true elt) size in
         [%expr let [%p a.p] = [%e C.wrap_opt tya @@ alloc] in [%e body] ]
       | Some _ | None -> assert false end
   | _ -> body

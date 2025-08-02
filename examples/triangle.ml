@@ -474,7 +474,7 @@ end
 
 module Cmd = struct
   let framebuffer_info ~extent image =
-    let images = A.of_list Vkt.Image_view.ctype [image] in
+    let images = Vkt.Image_view.array [image] in
     Vkt.Framebuffer_create_info.make
       ~render_pass: Pipeline.simple_render_pass
       ~attachments: images

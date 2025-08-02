@@ -9,9 +9,9 @@ open Item
 open Utils
 
 let mkty ctx args ret =
-  let ret  = Type.converter ctx ~degraded:true ret in
+  let ret  = Type.converter ctx ~degraded:true ~struct_field:false ret in
   let fn = C.listr (fun l r -> [%expr[%e l] @-> [%e r] ])
-    (Type.converter ctx ~degraded:true)
+    (Type.converter ctx ~degraded:true ~struct_field:false)
     args
     [%expr returning [%e ret]] in
   [%expr let open Ctypes in [%e fn] ]
