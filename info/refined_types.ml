@@ -304,6 +304,18 @@ module Typexpr(X:name) = struct
   let pp_typedecl ppf (name,ty)=
     fp ppf "@[type %a=@ %a@]" X.pp name pp_def ty
 
+  (* When storing this value in a struct or union,
+     do we need to protect the value from the GC? *)
+  let rec is_cpointer = function
+    | Const x -> is_cpointer x
+    | Option x -> is_cpointer x
+    | Width x -> is_cpointer x.ty
+    | String -> true
+    | Ptr _ -> true
+    | Array _ -> true
+    | FunPtr _ -> true
+    | Name _ -> false
+    | Result _ -> false
 end
 
 module Simple_name = struct

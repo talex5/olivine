@@ -88,8 +88,12 @@ let sfield types (name,t) =
   (* Note: we could try to simplify further field names,
      but they happen to be quite short in practice *)
   let str = varname name and
-  conv = Type.converter types ~degraded:false t in
-  let ty = Type.mk ~raw_type:true ~decay_array:Dyn_array types t in
+  conv = Type.converter types ~degraded:false ~struct_field:true t in
+  let ty =
+    match t with
+    | String -> [%type: char Ctypes.ptr]
+    | Option String -> [%type: char Ctypes.ptr option]
+    | _ -> Type.mk ~raw_type:true ~decay_array:Dyn_array types t in
   item
     [%stri let [%p pat var name] = Ctypes.field [%e tn] [%e string str] [%e conv] ]
     (val' name [%type: ([%t ty] , t) Ctypes.field])
@@ -187,13 +191,33 @@ let inner = ~:"Fields"
 let setf r f value =
   [%expr Ctypes.setf [%e r] [%e ident(qn inner @@ f)] [%e value] ]
 
-let union types (n,ty) =
+let keep_alive exprs owner body =
+  match exprs with
+  | [] -> body
+  | [x] -> [%expr Vk__helpers.keep_alive [%e Exp.array [x]] [%e owner]; [%e body]]
+  | exprs -> [%expr Vk__helpers.keep_alive [%e Exp.tuple exprs] [%e owner]; [%e body]]
+
+let union types (n,ty) : (structure_item, signature_item) item =
   reset_uid ();
   let u = unique "x" and r = unique "res" in
-  item [%stri let [%p pat var n] = fun [%p u.p] ->
-      let [%p r.p] = Ctypes.make [%e tn] in
-      [%e setf r.e (varname n) u.e ]; [%e r.e]
-  ]
+  let fn =
+    match ty with
+    | Ty.(String | Option String as t) ->
+      fun body ->
+        let arg_type = Type.converter types ~degraded:false ~struct_field:false t in
+        let field_type = Type.converter types ~degraded:false ~struct_field:true t in
+        [%expr
+          let [%p u.p] = Ctypes.coerce [%e arg_type] [%e field_type] [%e u.e] in
+          [%e keep_alive [u.e] r.e body]]
+    | ty when Ty.is_cpointer ty -> keep_alive [u.e] r.e
+    | _ -> Fun.id
+  in
+  item
+    [%stri let [%p pat var n] = fun [%p u.p] ->
+        let [%p r.p] = Ctypes.make [%e tn] in
+        [%e fn (setf r.e (varname n) u.e) ];
+        [%e r.e]
+    ]
     (val' n [%type: [%t Type.mk types ty] -> t ])
 
 let type_field types typename = function
@@ -248,6 +272,10 @@ let getter typename types fields field =
       main @@
       Record_extension.merge (typename, exts) ~tag:(get_field' tag)
         ~data:(get_field' ptr)
+    | Simple (n, (String | Option String as t)) ->
+      let arg_type = Type.converter types ~degraded:false ~struct_field:false t in
+      let field_type = Type.converter types ~degraded:false ~struct_field:true t in
+      main @@ [%expr Ctypes.coerce [%e field_type] [%e arg_type] [%e get_field (varname n)]]
     | Simple (n, Array(Some (Lit i), ty )) when Inspect.is_char ty ->
       main [%expr Ctypes.string_from_ptr [%e start @@ get_field' n]
           [%e int.e i] ]
@@ -400,12 +428,6 @@ let pp types fields =
   let sep = [%expr pf ppf ";@ "] in
   def @@ [%expr [%e sseq sep pp_field fields]; pf ppf "@ }@]"]
 
-let keep_alive exprs owner body =
-  match exprs with
-  | [] -> body
-  | [x] -> [%expr Vk__helpers.keep_alive [%e Exp.array [x]] [%e owner]; [%e body]]
-  | exprs -> [%expr Vk__helpers.keep_alive [%e Exp.tuple exprs] [%e owner]; [%e body]]
-
 
 let def_fields (type a) (typename, kind: _ * a kind) types (fields: a list) =
   let seal = hidden [%stri let () = Ctypes.seal [%e tn] ] in
@@ -444,8 +466,7 @@ let def types (_,kind as tk) name fields =
   ^:: unsafe_make_i ^:: nil
 
 let keep_field_alive vars acc = function
-  (*  | Ty.Simple(_,Array _ ) -> acc *)
-  | Ty.Simple(f, _ ) -> ex (M.find @@ varname f) vars :: acc
+  | Ty.Simple(f, _ ) | Array_f { index = _; array = (f, _) } -> ex (M.find @@ varname f) vars :: acc
   | _ -> acc
 
 let array =
@@ -459,6 +480,14 @@ let array =
     ]
     (val' ~:"array" [%type: t list -> t Ctypes.CArray.t ] )
 
+let string_to_ptr types (vars : (pattern, expression) dual M.t) body = function
+  | Ty.Simple (f, (String | Option String as t)) ->
+    let v = M.find (varname f) vars in
+    let arg_type = Type.converter types ~degraded:false ~struct_field:false t in
+    let field_type = Type.converter types ~degraded:false ~struct_field:true t in
+    [%expr let [%p v.p] = Ctypes.coerce [%e arg_type] [%e field_type] [%e v.e] in [%e body]]
+  | _ -> body
+
 let construct types tyname fields =
   let fn, m = mkfun fields in
   let res = unique "res" in
@@ -470,7 +499,8 @@ let construct types tyname fields =
     [%expr let [%p res.p] = Ctypes.make [%e tn] in
       [%e keep_alive @@ seq set fields res.e ]
     ] in
-  item [%stri let make = [%e fn body]]
+  let strings body = List.fold_left (string_to_ptr types m) body fields in
+  item [%stri let make = [%e fn (strings body)]]
     (val' ~:"make" @@
      Type.fn types ~regular_struct:true ~with_label:true tyname fields [%type: t])
 

@@ -9,7 +9,7 @@ open U
 let ptr types = function
   | Ty.Option _ -> [%expr None]
   | t ->
-    C.coerce ~from:C.(ptr void) ~to':(Type.converter types ~degraded:true t)
+    C.coerce ~from:C.(ptr void) ~to':(Type.converter types ~degraded:true ~struct_field:true t)
       [%expr Ctypes.null]
 
 

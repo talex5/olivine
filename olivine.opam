@@ -25,4 +25,5 @@ depends: [
   "ctypes-foreign"
   "ctypes"
   "integers"
+  "alcotest" {with-test}
   ]
