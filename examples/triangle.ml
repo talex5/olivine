@@ -567,6 +567,9 @@ module Cmd = struct
 end
 
 module Render = struct
+  let in_flight_fence =
+    let create_info = Vkt.Fence_create_info.make ~flags:Vkt.Fence_create_flags.signaled () in
+    Vkc.create_fence ~device ~create_info () <?> "create_fence"
 
   let semaphore_info =
     Vkt.Semaphore_create_info.make ()
@@ -633,14 +636,28 @@ module Render = struct
       | Error x ->
         (Format.eprintf "Error %a in acquire_next" Vkt.Result.raw_pp x; exit 2)
 
+  let await_in_flight () =
+    let (<?>) x s = match x with
+      | Ok (_, x) -> x
+      | Error k -> Format.eprintf "Error %a: %s @." Vkt.Result.raw_pp k s; exit 1
+    in
+    let fences = Vkt.Fence.array [in_flight_fence] in
+    Vkc.wait_for_fences
+      ~device
+      ~fences
+      ~wait_all:true
+      ~timeout:Unsigned.UInt64.max_int <?> "wait_for_fences";
+    Vkc.reset_fences ~device ~fences <?> "reset_fences"
+
   let draw ?(extra_debug=false) ctx () =
     let cmd_buffers = !ctx.command_buffers in
     let swap_chain = !ctx.images.swap_chain in
+    await_in_flight ();
     let n = acquire_next ctx in
     A.set present_indices 0 n;
     if extra_debug then debug "Image %d acquired" n;
     let ( <!> ) = if extra_debug then ( <?> ) else ( <!> ) in
-    Vkc.queue_submit ~queue:Cmd.queue ~submits:(submit_info cmd_buffers present_indices) ()
+    Vkc.queue_submit ~queue:Cmd.queue ~submits:(submit_info cmd_buffers present_indices) ~fence:in_flight_fence ()
     <!> "Submit to queue";
     match Swapchain.queue_present_khr Cmd.queue (present_info swap_chain) with
     | Ok ((`Success|`Suboptimal_khr) as r, ()) ->
