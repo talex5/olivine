@@ -78,6 +78,17 @@ module Sdl = struct
 
 end
 
+let string_array xs =
+  let arr = A.make Ctypes.(ptr char) (List.length xs) in
+  let xs = List.map Ctypes.(coerce string (ptr char)) xs in
+  List.iteri (A.set arr) xs;
+  Vk__helpers.keep_alive xs arr;
+  let arr : string A.t =
+    let p = Ctypes.to_voidp arr.astart |> Ctypes.(coerce (ptr void) (ptr string)) in
+    A.from_ptr p arr.alength
+  in
+  arr
+
 module Instance = struct
   (** Creating a vulkan instance *)
 
@@ -88,7 +99,7 @@ module Instance = struct
     Vkt.Instance_create_info.make
       ~flags: Vkt.Instance_create_flags.empty
       ~enabled_extension_names: extensions
-      (* ?layers: validation layers *)
+      ~enabled_layer_names:(string_array ["VK_LAYER_KHRONOS_validation"])
       ()
 
   ;; debug "Info created"
