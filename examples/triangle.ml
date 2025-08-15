@@ -93,7 +93,7 @@ module Instance = struct
   (** Creating a vulkan instance *)
 
   let extensions =
-    A.of_list Ctypes.string ["VK_KHR_surface"; "VK_KHR_xlib_surface" ]
+    string_array ["VK_KHR_surface"; "VK_KHR_xlib_surface" ]
 
   let info =
     Vkt.Instance_create_info.make

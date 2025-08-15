@@ -26,4 +26,5 @@ depends: [
   "ctypes"
   "integers"
   "alcotest" {with-test}
+  "tsdl" {with-test}
   ]
