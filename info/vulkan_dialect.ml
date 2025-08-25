@@ -61,6 +61,8 @@ let make spec =
   |> add Main "16Bit"
   |> add Main "8Bit"
   |> add Main "UUID"
+  |> add_word ~custom:["geometries"] "pGeometries"     (* A single struct has both of these, so can't strip prefix. *)
+  |> add_word ~custom:["geometries'"] "ppGeometries"
   |> add_word "AABB"
   |> add_word "CAMetalLayer"
   |> add_word "SM"

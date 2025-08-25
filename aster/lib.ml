@@ -288,15 +288,13 @@ let rec generate_ideal core dict registry current
     let items, lib =
       deps (dict,generate_ideal core dict registry current) build
         typ in
-    let lib = match typ with
-      | Alias Name n when List.mem n raw_builtins -> lib
+    let lib =
+      let typ = Rename.typedef renamer typ in
+      match typ with
+      | Bitfields _ as t -> let rname = U.bitset_core_name name in
+        lib |> add [types; rname] (Type (name, t))
       | _ ->
-        let typ = Rename.typedef renamer typ in
-        match typ with
-        | Bitfields _ as t -> let rname = U.bitset_core_name name in
-          lib |> add [types; rname] (Type (name, t))
-        | _ ->
-          lib |> add [types; name] (Type (name,typ))
+        lib |> add [types; name] (Type (name,typ))
     in
     (items,lib)
   | None -> Fmt.epr "Lost item %s@." p;

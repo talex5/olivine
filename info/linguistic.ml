@@ -1,4 +1,3 @@
-
 module Dict = struct
   type word_end = string list
   type t =
@@ -48,6 +47,7 @@ module Dict = struct
 
   let word_end = function
     | End l | Node {word_end = l; _ } -> l
+
   let terminal = function
     | End l -> l
     | Node _ -> []
@@ -62,54 +62,13 @@ module Dict = struct
         | None -> [], stop
         | Some t -> read_subword w (current+1) stop t
 
+  (* Look up [w] in [t], stopping at either the end of [w] or
+     when the dictionary has no more options.
+     Returns the value at the point where it stopped, and the location. *)
   let read_word_all w start t =
     read_subword w start (String.length w) t
 
 end
-
-let split_on_pred pred s =
-  let len = String.length s in
-  let rec analyze start curr =
-    if curr >= len then
-      [String.sub s start (curr - start)]
-    else if pred s.[curr] then
-        String.sub s start (curr - start) :: analyze curr (curr + 1)
-    else
-      analyze start (curr + 1) in
-  analyze 0 0
-
-let split_camel_case s =
-  let mx = String.length s in
-  let sub first after = String.sub s first (after-first) in
-  let protect k l start n =
-    if n >= mx then
-      if start < n then
-        List.rev @@ sub start mx :: l
-      else l
-    else k l start n in
-  let rec lower acc start n =
-    let c = s.[n] in
-    if Char.lowercase_ascii c <> c then
-      protect capital (sub start n :: acc) n (n+1)
-    else
-      protect lower acc start (n+1)
-  and capital acc start n =
-    let c = s.[n] in
-    if Char.uppercase_ascii c = c then
-      protect upper acc start (n+1)
-    else
-      protect lower acc start (n+1)
-  and upper acc start n =
-    let c = s.[n] in
-    if Char.uppercase_ascii c <> c then
-      protect lower (sub start n :: acc) n (n+1)
-    else
-      protect upper acc start (n+1) in
-  if s = "" then [] else
-    if Char.lowercase_ascii s.[0] = s.[0] then
-      protect lower [] 0 1
-    else
-      protect capital [] 0 1
 
 let is_num = function
   | '0' .. '9' -> true
@@ -129,14 +88,15 @@ let split_sticky_camel_case dict s =
     else
       sub start (n+1) :: acc
   and capital k acc start =
+    if start = mx then acc else
     let word_stop, n =
     match Dict.read_word_all s start dict with
     |  _ :: _ as l, stop -> l, stop
     | [], _ -> [], start + 1 in
     let stop = n = mx in
-    if stop then sub start n :: acc
-    else match word_stop with
+    match word_stop with
       | _ :: _ as l -> capital lower ( List.rev_append l  acc ) n
+      | [] when stop -> sub start n :: acc
       | [] ->  k acc start n
   and numeric acc start n =
     let c = s.[n] in
@@ -149,7 +109,7 @@ let split_sticky_camel_case dict s =
   List.rev @@ capital lower [] 0
 
 
-let lower s =String.lowercase_ascii s
+let lower s = String.lowercase_ascii s
 
 type role = Prefix | Main | Postfix | Extension
 
@@ -165,20 +125,17 @@ let rec clean = function
 module M = Common.StringMap
 type dict = { words:Dict.t; roles: role M.t; context:name }
 
-let compose x y = { prefix = x.prefix @ y.prefix;
-                    main = x.main @ y.main;
-                    postfix = x.postfix @ y.postfix
-                  }
-
 let string_prefix s s2 =
   let n = String.length s in
   String.length s2 >= n &&
   s = String.sub s2 0 n
 
 
+(* Split [name] on underscores or (if no underscores) based on case.
+   Also, remove any "PFN_" prefix and convert to lower-case. *)
 let path dict name =
   let path =
-    if string_prefix "PFN" name then
+    if string_prefix "PFN_" name then
       split_sticky_camel_case dict.words
       @@ String.sub name 4 (String.length name - 4)
     else if String.contains name '_' then
@@ -196,9 +153,10 @@ let rsplit pred m =
     else
       (n+1) in
   check (String.length m - 1)
+
 let prepath =
   let rec fixnum = function
-    | (("1"|"2"|"3"|"4"|"5") as n) :: ("d" as d ) :: q ->
+    | (("1"|"2"|"3"|"4"|"5") as n) :: ("d" as d) :: q ->
       (n ^ d) :: fixnum q
     | c :: q ->
       let n =String.length c in
@@ -212,30 +170,11 @@ let prepath =
     | [] -> [] in
   function
   | [] -> []
-  | ["p"; "geometries"] as q -> q               (* Hack: we have both `pGeometries` and `ppGeometries` *)
+  (*   | ["p"; "geometries"] as q -> q               (* Hack: we have both `pGeometries` and `ppGeometries` *) *)
   | ("p"|"pp") :: q | q -> fixnum q
 
-(*
-let rec prepath = function
-  | (m, opt as x) :: ("d", _ as d) :: q->
-    let n =String.length m in
-    let dim = String.sub m (n-1) 1 in
-    if is_num dim.[0] then
-      let m' = String.sub m 0 (n-1) in
-      let opt' = match opt with
-        | None -> None
-        | Some x -> Some (String.sub x 0 (n-1)) in
-      (m',opt') :: (cat (dim,None) d) :: prepath q
-    else
-      x :: d :: prepath q
-  | x :: (("1d"|"2d"|"3d"|"4d"), _ as dim) :: q ->
-    x :: dim :: prepath q
-  | x :: (c, _ as y) :: q when is_num c.[0] ->
-    (cat x y) ::  prepath q
-  | [] -> []
-  | a :: q -> a :: prepath q
-*)
-
+(* [from_path dict path] splits [path] into prefix/main/postfix parts, according to [dict.roles].
+   Also uses [prepath] for some extra clean-up first. *)
 let from_path dict path =
   let empty = { prefix = []; main = []; postfix = [] } in
   let rec pre acc = function
@@ -274,19 +213,6 @@ let remove_prefix prefix name =
   remove_prefix name prefix name
 
 
-let subst_prefix ~old ~newer name =
-  let rec subst ~back ~old ~newer ~current =
-    match old, current, newer with
-    | [] , l, more -> Ok (more @ l)
-    | p :: old, w :: current, p' :: newer when p = w ->
-      begin match subst ~back ~old ~newer ~current  with
-          | Ok r -> Ok (p'::r)
-          | Error _ as e -> e
-      end
-    | _ :: _, _, _ -> Error back in
-  subst ~back:name ~old ~newer ~current:name
-
-
 let remove_context context a =
   { prefix = remove_prefix context.prefix a.prefix;
     main = remove_prefix context.main a.main;
@@ -296,8 +222,6 @@ let remove_context context a =
 let make dict original =
   remove_context dict.context
   @@ from_path dict @@ path dict original
-
-let synthetize dict l = from_path dict l
 
 let snake ppf () = Fmt.pf ppf "_"
 
@@ -350,57 +274,5 @@ let pp_type ppf p =
 
 let pp_var ppf = pp_type ppf
 
-type nametree =
-  | Obj of Entity.t
-  | Node of (int * nametree M.t)
-
-let locate dict name obj nametree =
-  let path = path dict name in
-  let rec locate nametree = function
-    | [] -> assert false
-    | [a] -> M.add a (Obj obj) nametree
-    | a :: (_ :: _  as q) ->
-        let subtree =
-          match M.find a nametree with
-          | sm -> sm
-          | exception Not_found -> Node(0, M.empty) in
-        let n, sm =
-          match subtree with
-          | Obj _ -> 0, M.empty
-          | Node (n, sm)  -> n, sm in
-            M.add a (Node(n + 1, locate sm q)) nametree
-  in
-  locate nametree path
-
-
-let cardinal = function
-  | Obj _ -> 1
-  | Node (n, _ ) -> n
-
-let nametree dict x =
-  let m = M.fold (locate dict) x M.empty in
-  let c = M.fold (fun _ c s -> s + cardinal c ) m 0 in
-  Node(c,m)
-
-
-let rec pp_nametree ppf = function
-  | Obj _ -> ()
-  | Node (_,m) ->
-    let bs = List.filter (fun (_n,m) -> cardinal m > 5 ) (M.bindings m)
-    in
-    Fmt.pf ppf "@[<v 2>%a@]"
-      (Refined_types.Ty.pp_list (Refined_types.Ty.const "@;") pp_branch) bs
-and pp_branch ppf (name, m) =
-    Fmt.pf ppf "%s(%d):@;@[%a@]" name (cardinal m) pp_nametree m
-
-
-let count_names dict e =
-  let add_name m n =
-    let count = try 1 + M.find n m with Not_found -> 1 in
-    M.add n count m in
-  let add_names k _ m =
-    List.fold_left add_name m (path dict k) in
-  M.fold add_names e M.empty
 
 let (//) x s = { x with postfix = s :: x.postfix }
-let (++) s x = { x with prefix = s :: x.prefix }
