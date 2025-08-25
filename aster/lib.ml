@@ -256,8 +256,8 @@ let raw = L.simple["raw"]
 let types = L.simple["types"]
 
 let raw_builtins =
-  [ "uint_32_t";  "cametallayer"; "uint_16_t"; "int_16_t"; "void"; "int_32_t"; "uint_64_t";
-    "int_64_t"; "size_t"; "uint_8_t"; "int_8_t"; "float"; "double"; "int" ]
+  [ "uint32_t";  "cametallayer"; "uint16_t"; "int16_t"; "void"; "int32_t"; "uint64_t";
+    "int64_t"; "size_t"; "uint8_t"; "int8_t"; "float"; "double"; "int" ]
 
 
 let builtins dict =

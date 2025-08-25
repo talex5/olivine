@@ -381,7 +381,7 @@ let one_time  queue command_pool f =
 module Depth = struct
 
   let layout = Vkt.Image_layout.Depth_stencil_attachment_optimal
-  let format = Vkt.Format.D_32_sfloat
+  let format = Vkt.Format.D32_sfloat
 
   let format_properties =
     Vkc.get_physical_device_format_properties Device.phy format
@@ -648,7 +648,7 @@ module Texture = struct
   open Heat_equation
   let memsize = Vkt.Device_size.of_int @@ texsize * fsize
 
-  let format = Vkt.Format.R_32_sfloat
+  let format = Vkt.Format.R32_sfloat
   let src_buffer, memory = create_buffer Device.phy device
       Vkt.Buffer_usage_flags.transfer_src memsize
 
@@ -882,12 +882,12 @@ module Pipeline = struct
 
   let geom_attribute =
     Vkt.Vertex_input_attribute_description.make
-      ~location:0 ~binding:0 ~format:Vkt.Format.R32g32b32a_32_sfloat
+      ~location:0 ~binding:0 ~format:Vkt.Format.R32g32b32a32_sfloat
       ~offset:0
 
   let texel_attribute =
     Vkt.Vertex_input_attribute_description.make
-      ~location:1 ~binding:0 ~format:Vkt.Format.R32g_32_sfloat
+      ~location:1 ~binding:0 ~format:Vkt.Format.R32g32_sfloat
       ~offset:(Geom.geom_size * fsize)
 
   ;; A.set attributes 0 geom_attribute

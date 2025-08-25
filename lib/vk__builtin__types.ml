@@ -45,7 +45,7 @@ module Int = struct
 end
 
 module U8 = Unsigned.UInt8
-module Uint_8_t = struct
+module Uint8_t = struct
   open U8
   type t = U8.t
   let ctype = Ctypes.uint8_t
@@ -100,7 +100,7 @@ type size_t = Size_t.t
 let size_t = Size_t.ctype
 let size_t_opt = integer_opt (module Size_t)
 
-module Uint_32_t_0 = struct
+module Uint32_t_0 = struct
   let zero = 0
   let of_int x = x
   let to_int x = x
@@ -110,11 +110,11 @@ module Uint_32_t_0 = struct
   type t = int
   let ctype = uint_32_t
 end
-module Uint_32_t = struct include Uint_32_t_0
-  let ctype_opt = integer_opt (module Uint_32_t_0)
+module Uint32_t = struct include Uint32_t_0
+  let ctype_opt = integer_opt (module Uint32_t_0)
 end
 
-module Uint_16_t_0 = struct
+module Uint16_t_0 = struct
   let zero = 0
   let of_int x = x
   let to_int x = x
@@ -124,8 +124,8 @@ module Uint_16_t_0 = struct
   type t = int
   let ctype = uint_16_t
 end
-module Uint_16_t = struct include Uint_16_t_0
-  let ctype_opt = integer_opt (module Uint_16_t_0)
+module Uint16_t = struct include Uint16_t_0
+  let ctype_opt = integer_opt (module Uint16_t_0)
 end
 
 module Bool_32 = struct
@@ -138,7 +138,7 @@ module Bool_32 = struct
 end
 
 
-module Int_8_t = struct
+module Int8_t = struct
   let zero = 0
   let of_int x = x
   let to_int x = x
@@ -151,7 +151,7 @@ module Int_8_t = struct
 end
 
 
-module Int_16_t = struct
+module Int16_t = struct
   let zero = 0
   let of_int x = x
   let to_int x = x
@@ -164,7 +164,7 @@ module Int_16_t = struct
 end
 
 
-module Int_32_t = struct
+module Int32_t = struct
   let zero = 0
   let of_int x = x
   let to_int x = x
@@ -177,10 +177,10 @@ module Int_32_t = struct
   let ctype = Ctypes.view ~read ~write Ctypes.int32_t
   let ctype_opt = integer_opt' zero ctype
 end
-let int_32_t = Int_32_t.ctype
+let int_32_t = Int32_t.ctype
 
 
-module Int_64_t = struct
+module Int64_t = struct
   let zero = 0
   let of_int x = x
   let to_int x = x
@@ -193,10 +193,10 @@ module Int_64_t = struct
   let ctype = Ctypes.view ~read ~write Ctypes.int64_t
   let ctype_opt = integer_opt' zero ctype
 end
-let int_64_t = Int_64_t.ctype
+let int_64_t = Int64_t.ctype
 
 
-module Uint_64_t = struct
+module Uint64_t = struct
   let of_int =  U64.of_int
   let to_int = U64.to_int
   let zero = of_int 0

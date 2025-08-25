@@ -146,32 +146,9 @@ let path dict name =
   in
   path |> List.map lower |> clean
 
-let rsplit pred m =
-  let rec check n =
-    if n>0 && pred m.[n] then
-      check (n-1)
-    else
-      (n+1) in
-  check (String.length m - 1)
-
-let prepath =
-  let rec fixnum = function
-    | (("1"|"2"|"3"|"4"|"5") as n) :: ("d" as d) :: q ->
-      (n ^ d) :: fixnum q
-    | c :: q ->
-      let n =String.length c in
-      if n > 0 && is_num c.[n-1] && not (is_num c.[0]) then
-        let stop =  rsplit is_num c in
-        let num = String.sub c stop (n-stop) in
-        let c' = String.sub c 0 stop in
-        c' :: num :: fixnum q
-      else
-        c :: fixnum q
-    | [] -> [] in
-  function
+let prepath = function
   | [] -> []
-  (*   | ["p"; "geometries"] as q -> q               (* Hack: we have both `pGeometries` and `ppGeometries` *) *)
-  | ("p"|"pp") :: q | q -> fixnum q
+  | ("p"|"pp") :: q | q -> q
 
 (* [from_path dict path] splits [path] into prefix/main/postfix parts, according to [dict.roles].
    Also uses [prepath] for some extra clean-up first. *)

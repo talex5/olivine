@@ -57,7 +57,7 @@ let test_union_ptr () =
 let bit n = 1 lsl n
 let test_awkward_names () =
   (* Annoying extra underscore makes this look ugly: *)
-  Alcotest.(check int) "Format" 97 Vkt.Format.(to_int R16g16b16a_16_sfloat);
+  Alcotest.(check int) "Format" 97 Vkt.Format.(to_int R16g16b16a16_sfloat);
   (* A bit-field with no values: *)
   Alcotest.(check int) "VkDeviceCreateFlags" 0 Vkt.Device_create_flags.(to_int empty);
   (* Android is an extension, but also used within the name: *)
