@@ -164,6 +164,7 @@ module Typexpr(X:name) = struct
     | FunPtr of fn
     | Result of { ok: name list; bad: name list }
     | Width of { size:int; ty:typexpr }
+    | Record_type of name * name     (* For sType fields, which have a fixed value *)
 
   and simple_field = name * typexpr
   and field =
@@ -237,6 +238,7 @@ module Typexpr(X:name) = struct
         ppl ok ppl bad
     | Width { size; ty } ->
       Format.fprintf ppf "%a:%d" pp ty size
+    | Record_type (name, values) -> fp ppf "%a(%a)" X.pp name X.pp values
 
 
   and pp_simple_field ppf (name, t) =
@@ -306,6 +308,7 @@ module Typexpr(X:name) = struct
     | FunPtr _ -> true
     | Name _ -> false
     | Result _ -> false
+    | Record_type _ -> false
 end
 
 module Simple_name = struct

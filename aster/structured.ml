@@ -310,6 +310,7 @@ let array_len x = [%expr Ctypes.CArray.length [%e x] ]
 let convert_string n s =
   [%expr Vk__helpers.convert_string [%e n] [%e s] ]
 
+let structure_type = L.simple ["structure"; "type"]
 
 let set types _typ r field value =
   let name = varname % fst and ty = snd in
@@ -338,6 +339,9 @@ let set types _typ r field value =
     setf (varname f) (start value.e)
   | Ty.Simple(f, Option Array(Some (Path _|Math_expr _), _)) ->
     setf (varname f) (imay [%expr Ctypes.CArray.start] value.e)
+  | Ty.Simple (f, Record_type (_, v)) ->
+    let v = L.remove_context structure_type v in
+    setf (varname f) (ident (Record_extension.flag v))
   | Ty.Simple (f,_ty) ->
     setf (varname f) value.e
   | Ty.Array_f { index; array } as t when Inspect.is_option_f t ->
@@ -362,7 +366,7 @@ let rec printer types t =
     Inspect.prefix varpath types ~name:(~:"pp") module' in
   let abstract = [%expr Vk__helpers.Pp.abstract] in
   match t with
-  | Ty.Name t ->
+  | Ty.Name t | Record_type (t, _) ->
     begin match B.find_type t types with
       | exception Not_found -> pp t
       | Some (Ty.(Alias FunPtr _) |Union _ ) -> abstract
@@ -476,9 +480,13 @@ let construct types tyname fields =
   let fn, m = mkfun arg_fields in
   let res = unique "res" in
   let set field =
-    if Inspect.is_extension field then setf res.e (varname (C.repr_name field)) (Record_extension.str tyname)
-    else set types tyname res.e field
-      (M.find (varname @@ C.repr_name field) m) in
+    match field with
+    | Ty.Simple (_, Record_type (_, v)) ->
+      let v = L.remove_context structure_type v in
+      setf res.e (varname (C.repr_name field)) (ident (Record_extension.flag v))
+    | _ ->
+      set types tyname res.e field
+        (M.find (varname @@ C.repr_name field) m) in
   let keep_alive =
     keep_alive (List.fold_left (keep_field_alive m) [] fields) res.e in
   let body =

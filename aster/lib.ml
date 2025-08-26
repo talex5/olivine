@@ -194,7 +194,7 @@ let rec dep_typ (dict,gen as g) (items,lib as build) =
       | _ -> assert false
     end
   | FunPtr {return; _ } -> dep_typ g build return
-  | String -> build
+  | String | Record_type _ -> build
 
 
 let dep_fields gen fields build =

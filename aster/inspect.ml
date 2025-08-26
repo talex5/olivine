@@ -63,7 +63,7 @@ let rec nullable ctx = function
       | exception Not_found -> false
     end
   | Const x | Width {ty=x; _ } -> nullable ctx x
-  | Array _  | String | Result _ -> false (* to be refined *)
+  | Array _  | String | Result _ | Record_type _ -> false (* to be refined *)
 
 let vk_prefix ctx name =
   if in_extension ctx then
@@ -110,7 +110,7 @@ let is_result_def = function
 
 let is_extension =
   function
-  | Ty.Simple (_, Ty.Name {prefix = []; main = ["structure"; "type"]; postfix = []}) -> true
+  | Ty.Simple (_, Ty.Record_type _) -> true
   | _ -> false
 
 let rec find_field_type name = function

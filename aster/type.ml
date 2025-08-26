@@ -37,7 +37,7 @@ let rec converter types ~struct_field ~degraded x =
   let make ?(struct_field=false) = converter types ~struct_field ~degraded in
   match x with
   | Ty.Const t -> make ~struct_field t
-  | Name n -> tyvar n
+  | Name n | Record_type (n, _) -> tyvar n
   | Ptr Name n | Ptr Const Name n ->
     [%expr Ctypes.ptr [%e tyvar n]]
   | Ptr ty -> [%expr Ctypes.ptr [%e make ty] ]
@@ -83,7 +83,7 @@ let rec mk
   | Ty.Const t -> mk ~regular_struct ~strip_option t
   | Ptr Name n when regular_struct && Inspect.is_record types n ->
     typ n
-  | Name n ->
+  | Name n | Record_type (n, _) ->
     let t = typ n in
     begin match B.find_type n types with
       | None -> t
@@ -128,7 +128,7 @@ let fn types
     ?(regular_struct=false)
     ?(mono=true)
     ?(with_label=false)
-    fname fields ret =
+    _fname fields ret =
   let mkty = mk types ~decay_array ~regular_struct ~mono
       ~strip_option:with_label in
   let (->>) (l,x) r =
@@ -142,9 +142,6 @@ let fn types
   let arg f = match f with
     | Ty.Array_f { array=n, ty; _ } ->
       label n f, mkty ty
-    | x when Inspect.is_extension x ->
-      label ~:"ext" f ,
-      typ types (Record_extension.name fname)
     | Simple(n,ty) as f ->
       label n f , mkty ty
   in

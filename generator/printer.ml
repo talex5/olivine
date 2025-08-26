@@ -46,7 +46,7 @@ let rec type_to_ast ctx (name,ty) =
   match ty with
   | Ty.Alias Result {ok;bad} ->
     Aster.Result.make ctx (name,ok,bad)
-  | Ty.Alias Name t -> Aster.Misc.alias ctx (name,t)
+  | Ty.Alias (Name t | Record_type (t, _)) -> Aster.Misc.alias ctx (name,t)
   | Ty.Alias FunPtr fn -> Aster.Funptr.make ctx (name,fn)
   | Union fields -> Aster.Structured.make ctx Union (name,fields)
   | Bitset { field_type = Some _; _ } -> I.nil

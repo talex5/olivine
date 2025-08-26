@@ -211,8 +211,15 @@ let result_refine (s,e) ty =
     Result { ok = sum s; bad = sum e }
   | _ -> ty
 
+let stype_refine node ty =
+  match node%?("values"), ty with
+  | Some values, Ty.Name n ->
+    assert (not (String.contains values ','));  (* todo *)
+    Ty.Record_type (n, values)
+  | _ -> ty
+
 let refine node t =
-  option_refine node @@ array_refine node t
+  stype_refine node @@ option_refine node @@ array_refine node t
 
 let map2 f (x,y) = (x,f y)
 

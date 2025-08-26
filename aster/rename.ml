@@ -27,6 +27,7 @@ let rec typ (!) x =
   | Result r -> Ty.Result{ ok = List.map (!) r.ok;
                            bad = List.map (!) r.bad }
   | Width { size; ty } -> Width { size; ty = typ ty }
+  | Record_type (n, v) -> Record_type (!n, !v)
 and typedef (!) = function
   | Cty.Handle p ->
     Ty.Handle { parent = may (!) p.parent; dispatchable=p.dispatchable }
