@@ -251,7 +251,7 @@ let full_pp ppf n =
   let sep ppf ()  = Fmt.pf ppf "—" in
   let list = Fmt.list ~sep pp_w in
   Fmt.pf ppf "{%a|%a|%a}"
-    list n.prefix list n.main list n.postfix
+    list n.prefix list n.main list (List.rev n.postfix)
 
 
 let is_extension dict = function
