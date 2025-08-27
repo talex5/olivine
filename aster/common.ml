@@ -56,14 +56,6 @@ let id_maker () =
   let reset () = dict := M.empty in
   unique, reset
 
-let module_name name =
-  let rec rename = function
-    |  "bits" :: "flag" :: q ->
-      "flags" :: q
-    | [] -> []
-    | a :: q -> a :: rename q in
-  L.{ name with postfix = rename name.postfix }
-
 let repr_name = function
   | Ty.Array_f { array = a, _ ; _ } -> a
   | Simple(n, _ ) -> n

@@ -350,8 +350,16 @@ let handle = with_aliases @@ fun spec node ->
   let ty = Ty.Handle { dispatchable = d; parent } in
   register name (Type ty) spec
 
+let re_flag_bits = Str.regexp_string "FlagBits"
+
 let enum = with_aliases @@ fun spec node ->
-  register (node%("name")) (Type (Ty.Enum [])) spec
+  let name = node%("name") in
+  let ty =
+    match Str.search_backward re_flag_bits name (String.length name - 1 ) with
+    | _ -> Ty.Bitfields { fields = []; values = [] }
+    | exception Not_found -> Ty.Enum []
+  in
+  register name (Type ty) spec
 
 
 let c_include spec node =
@@ -485,7 +493,7 @@ let enums spec x =
         | Some ty ->
         let ty =
         match ty with
-        | Type Enum [] ->
+        | Type Bitfields { fields = []; values = [] } ->
           let fields, values =
             List.fold_left bitset_data ([], []) x.children in
           Ty.Bitfields { fields; values}
@@ -586,13 +594,27 @@ let black_list spec =
     entities in
   { spec with entities }
 
+(* Some types are missing a "requires". e.g. VkDeviceCreateFlags should really require VkDeviceCreateFlagBits.
+   Add that in here. *)
+let fixup_enums spec =
+  let fixup name : Entity.t -> Entity.t = function
+    | Type (Bitset ({ field_type = None; _ } as x)) as orig ->
+      let field_type = String.sub name 0 (String.length name - 1) ^ "Bits" in
+      if N.mem field_type spec.entities then (
+        Fmt.epr "Fixup: %s now requires %s@." name field_type;
+        Type (Bitset {x with field_type = Some field_type})
+      ) else orig
+    | x -> x
+  in
+  { spec with entities = N.mapi fixup spec.entities }
+
 let typecheck tree =
   let root spec = function
     | Xml.Node { children; _ } ->
       List.fold_left section spec children
     | Data _ -> type_errorf "root: unexpected data"
   in
-  extend @@ black_list @@ root {
+  fixup_enums @@ extend @@ black_list @@ root {
     vendor_ids = [];
     tags = [];
     entities = N.empty;

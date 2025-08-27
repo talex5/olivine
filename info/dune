@@ -1,6 +1,6 @@
 (library
  (name info)
- (libraries xmlm fmt ctypes)
+ (libraries xmlm fmt ctypes str)
  (modules :standard \ infolivine))
 
 (menhir
