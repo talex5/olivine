@@ -50,13 +50,33 @@ let test_union_ptr () =
   Gc.full_major ();
   Alcotest.(check string) "String after GC" s @@ get x
 
+(* Mostly we just care that this test compiles.
+   Note: some of these names are bad; the test should be updated if they improve
+   but helps to track what's changed. *)
+let bit n = 1 lsl n
+let test_awkward_names () =
+  (* Annoying extra underscore makes this look ugly: *)
+  Alcotest.(check int) "Format" 97 Vkt.Format.(to_int R16g16b16a_16_sfloat);
+  (* A bit-field with no values: *)
+  Alcotest.(check int) "VkDeviceCreateFlags" 0 Vkt.Device_create_flags.(to_int empty);
+  (* Android is an extension, but also used within the name: *)
+  Alcotest.(check int) "Android-Android" (bit 10)
+    Vkt.External_memory_handle_type_flags.(to_int android_hardware_buffer_bit_android);
+  (* The leading n2 shouldn't be here: *)
+  Alcotest.(check int) "Pipeline flags" (bit 15) Vkt.Pipeline_stage_flags_2_khr.(to_int n2_all_graphics_bit_khr);
+  ()
+module type S2 = module type of Vk.Amd.Shader_core_properties_2 (* Extension sub-module with 2 in its name *)
+
 let () =
   let open Alcotest in
   run "Olivine" [
-      "gc", [
-          test_case "struct-string"  `Quick test_struct_string;
-          test_case "struct-ptr"     `Quick test_struct_ptr;
-          test_case "union-string"   `Quick test_union_string;
-          test_case "union-ptr"      `Quick test_union_ptr;
-        ];
-    ]
+    "gc", [
+      test_case "struct-string"  `Quick test_struct_string;
+      test_case "struct-ptr"     `Quick test_struct_ptr;
+      test_case "union-string"   `Quick test_union_string;
+      test_case "union-ptr"      `Quick test_union_ptr;
+    ];
+    "gen", [
+      test_case "awkward-names"  `Quick test_awkward_names;
+    ];
+  ]
