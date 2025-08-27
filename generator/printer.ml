@@ -63,7 +63,10 @@ let rec type_to_ast ctx (name,ty) =
           else Aster.Enum.Std in
         Aster.Enum.make kind (name,constrs)
       end
-    else I.nil
+    else (
+      Fmt.epr "%a is an enum and also a bitset!@." L.full_pp name;
+      I.nil
+    )
   | Record r ->
     Aster.Structured.make ctx Record (name,r.fields)
   | Alias Width w ->
@@ -155,6 +158,9 @@ let lib root (lib:B.lib) =
           let ast =
             I.(fold_map (item_to_ast [m.name] lib) m.sig')
           in
+          if ast = I.nil then
+            Fmt.epr "Generating empty module %s from %a@." filename
+              (Fmt.Dump.list B.pp_item) m.sig';
           print Str pps (str ppfs) ast;
           print Sig pps (sg ppfs) ast;
           Fmt.pf (str ppfs) "@.";

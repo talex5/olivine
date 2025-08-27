@@ -39,6 +39,13 @@ and item =
   | Ast of ast_item
 and sig' = item M.t
 
+let pp_item f = function
+  | Const (n, _) -> Fmt.pf f "Const %a" L.full_pp n
+  | Fn fn -> Fmt.pf f "Fn %a" Ty.pp_fn fn.fn
+  | Type (n, _) -> Fmt.pf f "Type %a" L.full_pp n
+  | Module m -> Fmt.pf f "Module %a" L.full_pp m.name
+  | Ast i -> Fmt.pf f "Ast %a" Astlib.Pprintast.structure i.structure
+
 let rec is_empty m =
   let empty_submodule  = function
     | Module m -> is_empty m

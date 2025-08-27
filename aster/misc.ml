@@ -19,10 +19,12 @@ let builtin' = L.(~:builtin)
 let view = L.(~:"view")
 let alias {B.builtins;_} (name,origin) =
   if not @@ B.Name_set.mem name builtins then begin
+(*
     B.Name_set.iter (fun n ->
         Format.eprintf "Builtin type: %a@." L.full_pp n)
       builtins;
     Format.eprintf "Alias %a@." L.full_pp name;
+*)
     let sign =
       let constraint' =
         H.Type.mk ~manifest:(typ ~par:[~:builtin; origin] ~:"t")
