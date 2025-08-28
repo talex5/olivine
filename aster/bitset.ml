@@ -12,22 +12,35 @@ let bit_name name =
   try
   let rec bitname = function
     | "flags" :: q ->
-      "bits" :: "flag" :: q
+      "flag" :: "bits" :: q
     | [] ->
       raise Exit
     | a :: q -> a :: bitname q in
-  L.{ name with postfix = bitname name.postfix }
+  L.{ name with main = bitname name.main }
   with Exit ->
-    raise @@ Invalid_argument (Format.asprintf "invalid bit name : [%a]" Fmt.(list string ~sep:comma) name.postfix)
-let set_name = bitset_core_name
+    Fmt.invalid_arg "invalid bit name %a" L.full_pp name
+
+let set_name = Utils.bitset_core_name
+
+let set_name_stem name =
+  let rec rename = function
+    | "flag" :: "bits" :: q -> q
+    | [] ->
+      Fmt.failwith "empty bitset name [] in %a" L.full_pp name
+    | a :: q -> a :: rename q in
+  L.{ name with main = rename name.main }
 
 let value_name set_name name =
   L.remove_context set_name name
 
 let field_name set_name name = let open L in
-  let context =
-    { set_name with postfix = set_name.postfix @ [ "bit" ]  } in
-  remove_context context name
+  let name = L.remove_context set_name name in
+  let rec strip_bit = function
+    | "bit" :: xs -> xs
+    | [] -> []
+    | x :: xs -> x :: strip_bit xs
+  in
+  { name with main = strip_bit name.main }
 
 let named ty namer f set_name (name,value) =
   let n = namer set_name name in
@@ -63,11 +76,7 @@ let resume bitname name =
   ^:: nil
 
 let make_extended (bitname, fields) =
-  let name = set_name bitname in
-  let core_name = let open L in
-    { name with postfix =
-                  List.filter (fun x -> x <> "flags") name.postfix }
-  in
+  let core_name = set_name_stem bitname in
   let values = values core_name fields in
   item
     [%stri include Vk__builtin__bitset.Make()]

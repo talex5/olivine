@@ -185,9 +185,8 @@ let (<?:>) ty msg = { ty with Parsetree.ptyp_attributes = [info msg] }
 
 let bitset_core_name name =
   let rec rename = function
-    |  "bits" :: "flag" :: q ->
-      "flags" :: q
+    | "flag" :: "bits" :: q -> "flags" :: q
     | [] ->
-      raise @@ Invalid_argument "empty bitset name []"
+      Fmt.failwith "empty bitset name [] in %a" L.full_pp name
     | a :: q -> a :: rename q in
-  L.{ name with postfix = rename name.postfix }
+  L.{ name with main = rename name.main }

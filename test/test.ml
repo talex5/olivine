@@ -1,4 +1,5 @@
 module Vkt = Vk.Types
+module L = Info.Linguistic
 
 let ( !@ ) = Ctypes.( !@ )
 
@@ -63,9 +64,40 @@ let test_awkward_names () =
   Alcotest.(check int) "Android-Android" (bit 10)
     Vkt.External_memory_handle_type_flags.(to_int android_hardware_buffer_bit_android);
   (* The leading n2 shouldn't be here: *)
-  Alcotest.(check int) "Pipeline flags" (bit 15) Vkt.Pipeline_stage_flags_2_khr.(to_int n2_all_graphics_bit_khr);
+  Alcotest.(check int) "Pipeline flags" (bit 15) Vkt.Pipeline_stage_flags_2_khr.(to_int all_graphics);
   ()
 module type S2 = module type of Vk.Amd.Shader_core_properties_2 (* Extension sub-module with 2 in its name *)
+
+let name = Alcotest.of_pp L.full_pp
+
+let dict, _exts =
+  let module M = Info.Common.StringMap in
+  let spec : Info.Structured_spec.t = {
+    aliases = M.empty;
+    vendor_ids = [];
+    tags = [ { name = "KHR"; author = ""; contact = "" } ];
+    entities = M.empty;
+    updates = [];
+    includes = [];
+    requires = [];
+    extensions = [];
+  } in
+  Info.Vulkan_dialect.make spec
+
+let mk_name ?(prefix=[]) ?(postfix=[]) main =
+  { L.prefix; main; postfix = List.rev postfix }
+
+let test_flag_bits2 () =
+  let ctx = L.make dict "VkPipelineStageFlagBits2KHR" in
+  Alcotest.check name "Context" (mk_name ["pipeline";"stage";"flag";"bits";"2"] ~postfix:["khr"]) ctx;
+  let ctx = Aster.Bitset.set_name_stem ctx in
+  Alcotest.check name "Stem" (mk_name ["pipeline";"stage";"2"] ~postfix:["khr"]) ctx;
+  let constr = L.make dict "VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT_KHR" in
+  Fmt.epr "ctx    = %a@." L.full_pp ctx;
+  Fmt.epr "constr = %a@." L.full_pp constr;
+  let expected = mk_name ["vertex"; "input"] in
+  Alcotest.check name "Remove prefix" expected (Aster.Bitset.field_name ctx constr)
+
 
 let () =
   let open Alcotest in
@@ -78,5 +110,8 @@ let () =
     ];
     "gen", [
       test_case "awkward-names"  `Quick test_awkward_names;
+    ];
+    "linguistic", [
+      test_case "flag_bits2"     `Quick test_flag_bits2;
     ];
   ]
