@@ -74,7 +74,7 @@ let foreign types fn =
 let make_simple types (f:Ty.fn) =
   item
     [[%stri let [%p (var f.name).p] = [%e foreign types f] ]]
-    [val' f.name @@ Type.fn ~decay_array:All types
+    [val' f.name @@ Type.fn ~decay_array:All ~with_label:Never types
        f.name (List.map (fun ty -> Ty.Simple ty) @@ Ty.flatten_fn_fields f.args)
        (Type.mk ~raw_type:true ~decay_array:All types f.return)]
 
@@ -118,6 +118,7 @@ let make_regular types fn =
         end
     ]
     [val' fn.name @@ Type.fn types
+       ~with_label:Never
        ~regular_struct:true
        fn.name (List.map (fun ty -> Ty.Simple ty) @@ Ty.flatten_fields args)
        (Type.mk types ~regular_struct:true fn.return)
@@ -125,12 +126,12 @@ let make_regular types fn =
 
 let make_labelled types m fn =
   let args = Inspect.to_fields fn.Ty.args in
-  let k, vars = Structured.mkfun args in
+  let k, vars = Structured.mkfun ~with_label:Always args in
   item
     [%stri let make =
              [%e k @@ apply (ident @@ qn m @@ varname fn.name) vars args]
     ]
-    [val' fn.name @@ Type.fn2 types ~regular_struct:true ~with_label:true fn]
+    [val' fn.name @@ Type.fn2 types ~regular_struct:true ~with_label:Always fn]
 
 
 module Option = struct
@@ -392,7 +393,7 @@ let make_native types (fn:Ty.fn)=
   let tyret = fn.return in
   let input' = Inspect.to_fields input in
   let all = Inspect.to_fields fn.args in
-  let fun', vars = Structured.mkfun input' in
+  let fun', vars = Structured.mkfun ~with_label:(Sometimes { fn_name = fn.name }) input' in
   let _, vars = look_out vars output in
   item [
   (fun x -> [%stri let [%p pat var fn.name] = [%e x] ]) @@
@@ -428,7 +429,7 @@ let make_native types (fn:Ty.fn)=
   else
     [%expr [%e apply]; [%e secondary result] ]
 ]
-    [val' fn.name @@ Type.fn types ~regular_struct:true ~with_label:true
+    [val' fn.name @@ Type.fn types ~regular_struct:true ~with_label:(Sometimes { fn_name = fn.name })
        fn.name input' (return_type types (Inspect.to_fields output) tyret)]
 
 let make types = function

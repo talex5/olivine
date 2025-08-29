@@ -642,12 +642,11 @@ module Render = struct
       | Error k -> Format.eprintf "Error %a: %s @." Vkt.Result.raw_pp k s; exit 1
     in
     let fences = Vkt.Fence.array [in_flight_fence] in
-    Vkc.wait_for_fences
+    Vkc.wait_for_fences fences
       ~device
-      ~fences
       ~wait_all:true
       ~timeout:Unsigned.UInt64.max_int <?> "wait_for_fences";
-    Vkc.reset_fences ~device ~fences <?> "reset_fences"
+    Vkc.reset_fences ~device fences <?> "reset_fences"
 
   let draw ?(extra_debug=false) ctx () =
     let cmd_buffers = !ctx.command_buffers in
@@ -657,7 +656,7 @@ module Render = struct
     A.set present_indices 0 n;
     if extra_debug then debug "Image %d acquired" n;
     let ( <!> ) = if extra_debug then ( <?> ) else ( <!> ) in
-    Vkc.queue_submit ~queue:Cmd.queue ~submits:(submit_info cmd_buffers present_indices) ~fence:in_flight_fence ()
+    Vkc.queue_submit Cmd.queue ~submits:(submit_info cmd_buffers present_indices) ~fence:in_flight_fence ()
     <!> "Submit to queue";
     match Swapchain.queue_present_khr Cmd.queue (present_info swap_chain) with
     | Ok ((`Success|`Suboptimal_khr) as r, ()) ->

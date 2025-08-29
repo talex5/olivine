@@ -49,12 +49,8 @@ let rec int_of_ty ctx var = function
   | _ -> raise @@ Invalid_argument "Invalid Structured.int_of_ty ty"
 
 
-let mkfun fields =
-  let label f name =
-    if Inspect.is_option_f f then
-      Asttypes.Optional name
-    else
-      Asttypes.Labelled name in
+let mkfun ~with_label fields =
+  let label f name = Type.arg_label with_label name f in
   let add_arg (k,m) =
     let def  ?opt f p body = k @@ Exp.fun_
         (label f @@ varname @@ C.repr_name f) opt p body in
@@ -477,7 +473,7 @@ let string_to_ptr types (vars : (pattern, expression) dual M.t) body = function
 
 let construct types tyname fields =
   let arg_fields = List.filter (Fun.negate Inspect.is_extension) fields in
-  let fn, m = mkfun arg_fields in
+  let fn, m = mkfun ~with_label:Always arg_fields in
   let res = unique "res" in
   let set field =
     match field with
@@ -496,7 +492,7 @@ let construct types tyname fields =
   let strings body = List.fold_left (string_to_ptr types m) body fields in
   item [%stri let make = [%e fn (strings body)]]
     (val' ~:"make" @@
-     Type.fn types ~regular_struct:true ~with_label:true tyname arg_fields [%type: t])
+     Type.fn types ~regular_struct:true ~with_label:Always tyname arg_fields [%type: t])
 
 let raw = L.(~:"Raw")
 

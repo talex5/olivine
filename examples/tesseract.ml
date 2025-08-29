@@ -112,7 +112,7 @@ let create_buffer phy device flag mem_size =
         () in
     let buffer = Vkc.create_buffer device buffer_info () <?> "Buffer creation" in
 
-    let memory_rqr = Vkc.get_buffer_memory_requirements ~device ~buffer in
+    let memory_rqr = Vkc.get_buffer_memory_requirements ~device buffer in
     debug "memory requirement: %a" Vkt.Memory_requirements.pp memory_rqr;
     let bit =
       memory_rqr #. Vkt.Memory_requirements.memory_type_bits in
@@ -372,7 +372,7 @@ let one_time  queue command_pool f =
   Vkc.end_command_buffer b <!> "End one time-command";
   let submits = Vkt.Submit_info.array
       [ Vkt.Submit_info.make ~command_buffers:buffers ()] in
-  Vkc.queue_submit ~queue ~submits () <?> "Submit one-time command";
+  Vkc.queue_submit queue ~submits () <?> "Submit one-time command";
   Vkc.queue_wait_idle queue <!> "Wait end one-time command";
   debug "Transition done";
   Vkc.free_command_buffers device command_pool buffers
@@ -434,8 +434,8 @@ module Depth = struct
     in
     (* Different stages support only subset of src and dst masks *)
     let stage = Vkt.Pipeline_stage_flags.top_of_pipe  in
-    Vkc.cmd_pipeline_barrier
-      ~command_buffer:b ~src_stage_mask:stage ~dst_stage_mask:stage
+    Vkc.cmd_pipeline_barrier b
+      ~src_stage_mask:stage ~dst_stage_mask:stage
       ~image_memory_barriers:(Vkt.Image_memory_barrier.array  [barrier]) ()
 
 end
@@ -654,7 +654,7 @@ module Texture = struct
 
   let transfer_data () = (* fill texture data *)
     let mem =
-      Vkc.map_memory ~device ~memory ~offset:zero_offset ~size:memsize ()
+      Vkc.map_memory ~device memory ~offset:zero_offset ~size:memsize ()
       <!> "Mapping memory for texture" in
     let data = Ctypes.(coerce (ptr void) (ptr float)) mem   in
     let a = A.from_ptr data Heat_equation.texsize in
@@ -707,7 +707,7 @@ module Texture = struct
           ()
     ]
     in
-    Vkc.cmd_pipeline_barrier ~command_buffer:cmd
+    Vkc.cmd_pipeline_barrier cmd
       ~src_stage_mask:Vkt.Pipeline_stage_flags.top_of_pipe
       ~dst_stage_mask:Vkt.Pipeline_stage_flags.top_of_pipe
       ~image_memory_barriers:barrier
@@ -1223,10 +1223,10 @@ module Cmd = struct
       Vkt.Subpass_contents.Inline;
     Vkc.cmd_bind_pipeline b Vkt.Pipeline_bind_point.Graphics Pipeline.x;
     Vkc.cmd_bind_vertex_buffers b 0 vertex_buffers offsets;
-    Vkc.cmd_bind_descriptor_sets ~command_buffer:b
+    Vkc.cmd_bind_descriptor_sets b
       ~pipeline_bind_point:Vkt.Pipeline_bind_point.Graphics
       ~layout:Pipeline.layout ~first_set:0
-      ~descriptor_sets: Uniform.descriptor_sets ();
+      Uniform.descriptor_sets ();
     Vkc.cmd_draw b Geom.( vertex_by_face* nfaces) 1 0 0;
     Vkc.cmd_end_render_pass b;
     Vkc.end_command_buffer b <!> "Command buffer recorded"
@@ -1285,7 +1285,7 @@ module Render = struct
     A.set present_indices 0 n;
     debug "Image %d acquired" n;
     let () = Uniform.transfer (Vec.zero `vec) Vec.id in
-    Vkc.queue_submit ~queue:Cmd.queue ~submits:(submit_info n) ()
+    Vkc.queue_submit Cmd.queue ~submits:(submit_info n) ()
     <?> "Submitting command to queue";
     Swapchain.queue_present_khr Cmd.queue present_info
     <!> "Image presented"
@@ -1312,7 +1312,7 @@ module Render = struct
     let x,y,z,t as state = phase x, phase y, phase z, phase t in
     let p = vec_phase p in
     let () = Uniform.transfer (fst p) (rot x y z t) in
-    Vkc.queue_submit ~queue:Cmd.queue ~submits:(submit_info present_indices) ()
+    Vkc.queue_submit Cmd.queue ~submits:(submit_info present_indices) ()
     <!> "Submit to queue";
     Swapchain.queue_present_khr Cmd.queue present_info
     <!> "Present to queue";

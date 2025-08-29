@@ -123,30 +123,55 @@ let rec mk
   | FunPtr _ -> C.not_implemented "funptr type"
   | Width t -> mk t.ty
 
+type labels =
+  | Never
+  | Sometimes of { fn_name : L.name }
+  | Always
+
+let rec list_starts_with ~prefix x =
+  match prefix, x with
+  | [], _ -> true
+  | p :: ps, x :: xs when p = x -> list_starts_with ~prefix:ps xs
+  | _ -> false
+
+let rec list_contains needle = function
+  | [] -> false
+  | l when list_starts_with ~prefix:needle l -> true
+  | _ :: xs -> list_contains needle xs
+
+let want_label ~fn_name name _ty =
+  if name = "command_buffer" then not (List.hd fn_name.L.main = "cmd")
+  else (
+    let name = String.split_on_char '_' name in
+    not (list_contains name fn_name.L.main)
+  )
+
+let arg_label mode name (f : Ty.field) : Asttypes.arg_label =
+  match mode with
+  | Never -> Nolabel
+  | Always | Sometimes _ when Inspect.is_option_f f -> Asttypes.Optional name
+  | Always -> Labelled name
+  | Sometimes { fn_name } -> if want_label ~fn_name name f then Labelled name else Nolabel
+
 let fn types
     ?(decay_array=None)
     ?(regular_struct=false)
     ?(mono=true)
-    ?(with_label=false)
+    ~with_label
     _fname fields ret =
   let mkty = mk types ~decay_array ~regular_struct ~mono
-      ~strip_option:with_label in
+      ~strip_option:(with_label <> Never) in
   let (->>) (l,x) r =
     H.Typ.arrow l x r in
-  let label n f =
-    if not with_label then Asttypes.Nolabel
-    else if Inspect.is_option_f f then
-      Asttypes.Optional (varname n)
-    else
-      Labelled (varname n) in
+  let label n f = arg_label with_label (varname n) f in
   let arg f = match f with
     | Ty.Array_f { array=n, ty; _ } ->
       label n f, mkty ty
     | Simple(n,ty) as f ->
-      label n f , mkty ty
+      label n f, mkty ty
   in
   let ret =
-    if List.exists Inspect.is_option_f fields && with_label then
+    if List.exists Inspect.is_option_f fields && with_label <> Never then
       (Nolabel, [%type: unit] ) ->> ret
     else
       ret in
@@ -156,6 +181,6 @@ let fn types
     List.fold_right (fun field f -> arg field ->> f ) fields ret
 
 let fn2 types ?(decay_array=None) ?(regular_struct=false) ?(mono=true)
-    ?(with_label=false) (f:Ty.fn) =
+    ?(with_label=Never) (f:Ty.fn) =
   fn types  ~decay_array ~regular_struct ~mono ~with_label f.name
     (Inspect.to_fields f.args) (mk types f.return)
