@@ -12,6 +12,8 @@ open Aliases
 open Item
 open Utils
 
+let record_type_constructor x = ident (qn (Utils.tymod (~:"Structure_type")) (mkconstr x))
+
 let unique, reset_uid = C.id_maker ()
 
 let of_int = L.simple ["of"; "int"]
@@ -337,7 +339,7 @@ let set types _typ r field value =
     setf (varname f) (imay [%expr Ctypes.CArray.start] value.e)
   | Ty.Simple (f, Record_type (_, v)) ->
     let v = L.remove_context structure_type v in
-    setf (varname f) (ident (Record_extension.flag v))
+    setf (varname f) (record_type_constructor v)
   | Ty.Simple (f,_ty) ->
     setf (varname f) value.e
   | Ty.Array_f { index; array } as t when Inspect.is_option_f t ->
@@ -479,7 +481,7 @@ let construct types tyname fields =
     match field with
     | Ty.Simple (_, Record_type (_, v)) ->
       let v = L.remove_context structure_type v in
-      setf res.e (varname (C.repr_name field)) (ident (Record_extension.flag v))
+      setf res.e (varname (C.repr_name field)) (record_type_constructor v)
     | _ ->
       set types tyname res.e field
         (M.find (varname @@ C.repr_name field) m) in
