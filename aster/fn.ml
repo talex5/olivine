@@ -71,7 +71,7 @@ let foreign types fn =
   [%expr foreign [%e string fn.original_name] [%e
       Funptr.mkty types args fn.return]]
 
-let make_simple types (f:Ty.fn) =
+let make_simple types (f:Ty.fn) (_:B.ext_context) =
   item
     [[%stri let [%p (var f.name).p] = [%e foreign types f] ]]
     [val' f.name @@ Type.fn ~decay_array:All ~with_label:Never types
@@ -104,7 +104,7 @@ let mkfn_simple fields =
     M.add (varname name) u vars in
   List.fold_left build ((fun x -> x), M.empty) fields
 
-let make_regular types fn =
+let make_regular types fn (_:B.ext_context) =
   let args = Inspect.to_fields fn.Ty.args in
   let f = unique "f" in
   let def body =
@@ -381,7 +381,10 @@ let return_type types outputs return =
 let raw ctx = if Inspect.in_extension ctx then
     ~:"Raw" else ~:"Vk__Raw"
 
-let make_native types (fn:Ty.fn)=
+let device_name = ~:"device"
+let instance_name = ~:"instance"
+
+let make_native types (fn:Ty.fn) (ext:B.ext_context) =
   reset_uid ();
   let rargs = regularize_fields types fn.args in
   let fold f l body = List.fold_right ((@@) f ) l body in
@@ -391,44 +394,54 @@ let make_native types (fn:Ty.fn)=
       (function { Ty.field = Array_f _ ; _ } -> true | _ -> false)
       output in
   let tyret = fn.return in
-  let input' = Inspect.to_fields input in
+  let implicit_arg, input' =
+    match ext, Inspect.to_fields input with
+    | Device_extension, Simple (_, Name n) :: xs when n = device_name -> Some "device", xs
+    | Instance_extension, Simple (_, Name n) :: xs when n = instance_name -> Some "instance", xs
+    | _, xs -> None, xs
+  in
   let all = Inspect.to_fields fn.args in
   let fun', vars = Structured.mkfun ~with_label:(Sometimes { fn_name = fn.name }) input' in
   let _, vars = look_out vars output in
-  item [
-  (fun x -> [%stri let [%p pat var fn.name] = [%e x] ]) @@
-  fun' @@
-  fold (input_expand types vars) input' @@
-  fold (allocate_field types input' vars) output @@
-
-  let apply =
-    (apply_regular ~attrs:[info "make_native"]
-      types (ident @@ qualify [raw types] @@ varname fn.name)
-      vars all
-      <?>
-      "fn.apply: context:[%a]/%a in extension %B" )
-      (Fmt.list L.full_pp) (types.B.current)
-      L.pp_module (raw types)
-      (Inspect.in_extension types)
+  let vars =
+    match implicit_arg with
+    | Some x -> M.add x { e = [%expr X.x]; p = H.Pat.any () } vars
+    | None -> vars
   in
-  let res =
-    if Inspect.is_void tyret then
-      Utils.any
-    else unique "res" in
-  let result =
-    let outs = List.map (to_output types vars) output in
-    [%expr let [%p res.p] = [%e apply] in [%e join tyret res.e outs] ] in
-  let secondary = fold (secondary_allocate_field types vars) output in
-  if not apply_twice then
-    result
-  else if Inspect.is_result fn.return then
-    [%expr match [%e apply] with
-      | Error _ as e -> e
-      | Ok _ -> [%e secondary result]
-    ]
-  else
-    [%expr [%e apply]; [%e secondary result] ]
-]
+  item [
+    (fun x -> [%stri let [%p pat var fn.name] = [%e x] ]) @@
+    fun' @@
+    fold (input_expand types vars) input' @@
+    fold (allocate_field types input' vars) output @@
+
+    let apply =
+      (apply_regular ~attrs:[info "make_native"]
+         types (ident @@ qualify [raw types] @@ varname fn.name)
+         vars all
+       <?>
+       "fn.apply: context:[%a]/%a in extension %B" )
+        (Fmt.list L.full_pp) (types.B.current)
+        L.pp_module (raw types)
+        (Inspect.in_extension types)
+    in
+    let res =
+      if Inspect.is_void tyret then
+        Utils.any
+      else unique "res" in
+    let result =
+      let outs = List.map (to_output types vars) output in
+      [%expr let [%p res.p] = [%e apply] in [%e join tyret res.e outs] ] in
+    let secondary = fold (secondary_allocate_field types vars) output in
+    if not apply_twice then
+      result
+    else if Inspect.is_result fn.return then
+      [%expr match [%e apply] with
+        | Error _ as e -> e
+        | Ok _ -> [%e secondary result]
+      ]
+    else
+      [%expr [%e apply]; [%e secondary result] ]
+  ]
     [val' fn.name @@ Type.fn types ~regular_struct:true ~with_label:(Sometimes { fn_name = fn.name })
        fn.name input' (return_type types (Inspect.to_fields output) tyret)]
 

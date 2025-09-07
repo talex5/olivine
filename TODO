@@ -5,9 +5,6 @@
 
 * Recognize primitive implementation of sum types in function inputs
 
-* Specialize extension functions to use the extension functor argument
-  when possible.
-
 * Liveness analysis: make sure that the GC don't collect values that live
 on the C side
 

@@ -83,7 +83,7 @@ let rec item_to_ast current (lib:B.lib) item =
   | B.Type (name,t) ->
     type_to_ast ctx (name,t)
   | Const (name,c) -> Aster.Misc.Const.make (name,c)
-  | Fn f -> Aster.Fn.make ctx f.implementation f.fn
+  | Fn f -> Aster.Fn.make ctx f.implementation f.fn f.ctx
   | Ast s -> s
   | Module m -> module_to_ast current lib m
 and module_to_ast path lib (m:B.module') =

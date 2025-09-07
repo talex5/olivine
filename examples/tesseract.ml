@@ -315,11 +315,11 @@ module Image = struct
       ()
 
   let swap_chain =
-    Swapchain.create_swapchain_khr device swap_chain_info ()
+    Swapchain.create_swapchain_khr swap_chain_info ()
     <?> "swap chain creation"
 
   let images =
-    Swapchain.get_swapchain_images_khr device swap_chain
+    Swapchain.get_swapchain_images_khr swap_chain
     <?> "Swapchain images"
 
   ;; debug "Swapchain: %d images" (A.length images)
@@ -1279,7 +1279,7 @@ module Render = struct
       ()
 
   let debug_draw () =
-    let n = Swapchain.acquire_next_image_khr ~device ~swapchain:Image.swap_chain
+    let n = Swapchain.acquire_next_image_khr ~swapchain:Image.swap_chain
       ~timeout:Unsigned.UInt64.max_int ~semaphore:im_semaphore ()
             <?> "Acquire image" in
     A.set present_indices 0 n;
@@ -1291,7 +1291,7 @@ module Render = struct
     <!> "Image presented"
 
   let rec acquire_next () =
-    match  Swapchain.acquire_next_image_khr ~device
+    match  Swapchain.acquire_next_image_khr
              ~swapchain:Image.swap_chain
                ~timeout:Unsigned.UInt64.max_int ~semaphore:im_semaphore () with
       | Ok ((`Success|`Suboptimal_khr), n) -> n

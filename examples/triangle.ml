@@ -241,11 +241,11 @@ module Images = struct
       ()
 
   let swap_chain info =
-    Swapchain.create_swapchain_khr device info ()
+    Swapchain.create_swapchain_khr info ()
     <?> "swap chain creation"
 
   let images swap_chain =
-    Swapchain.get_swapchain_images_khr device swap_chain
+    Swapchain.get_swapchain_images_khr swap_chain
     <?> "Swapchain images"
 
   let component_mapping =
@@ -625,7 +625,7 @@ module Render = struct
 
   let rec acquire_next ctx =
       let swapchain = !ctx.images.swap_chain in
-      match  Swapchain.acquire_next_image_khr ~device ~swapchain
+      match  Swapchain.acquire_next_image_khr ~swapchain
                ~timeout:Unsigned.UInt64.max_int ~semaphore:im_semaphore () with
       | Ok ((`Success|`Suboptimal_khr), n) -> n
       | Ok ((`Timeout|`Not_ready), _ ) -> acquire_next ctx

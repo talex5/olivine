@@ -20,9 +20,17 @@ type 'a with_deps = { x:'a; deps: Deps.t }
 type const = Arith.t
 type typedef' = Ty.typedef
 type fn = Ty.fn
-type implementation = Raw | Regular | Native
+type implementation =
+  | Raw
+  | Regular     (* A function that doesn't need to be simplified. *)
+  | Native      (* A simplied version for [Vk.Core] *)
 
 module M = Info.Common.StringMap
+
+type ext_context =
+  | Core
+  | Instance_extension
+  | Device_extension
 
 type module' = {
   name : L.name;
@@ -33,7 +41,7 @@ type module' = {
 
 and item =
   | Const of L.name * const
-  | Fn of { implementation: implementation; fn:fn }
+  | Fn of { implementation: implementation; fn:fn; ctx:ext_context }
   | Type of L.name * typedef'
   | Module of module'
   | Ast of ast_item
@@ -265,8 +273,13 @@ let builtins dict =
   L.simple ["bool";"32"]
   :: List.map (rename dict) raw_builtins
 
+(* Core functions go in Vk.Core *)
+let adjust_function_location name = function
+  | Core -> name @ [core]
+  | Instance_extension | Device_extension -> name
+
 (** Remove [p] from [items] and extend the module tree [lib] with it. *)
-let rec generate_ideal core dict registry current
+let rec generate_ideal (ctx : ext_context) dict registry current
     (items, lib as build) p =
   if not @@ S.mem p items then build else
   let (items, lib as build ) = (S.remove p items, lib) in
@@ -278,22 +291,22 @@ let rec generate_ideal core dict registry current
     items,lib
   | Some Info.Entity.Fn fn ->
     let items, lib =
-      dep_fn (dict, generate_ideal core dict registry current)
+      dep_fn (dict, generate_ideal ctx dict registry current)
         fn build in
     let fn = refine_fn @@ Rename.fn renamer fn in
     let lib =
       if Ty.is_simple fn then
         lib
-        |> add ( core current ) (Fn { implementation=Regular; fn})
-        |> add (current @ [raw]) (Fn {implementation=Raw; fn})
+        |> add (adjust_function_location current ctx) (Fn { implementation=Regular; fn; ctx})
+        |> add (current @ [raw]) (Fn {implementation=Raw; fn; ctx})
       else
         lib
-        |> add ( core current ) (Fn {implementation=Native; fn})
-        |> add (current @ [raw]) (Fn {implementation=Raw; fn}) in
+        |> add (adjust_function_location current ctx) (Fn {implementation=Native; fn; ctx})
+        |> add (current @ [raw]) (Fn {implementation=Raw; fn; ctx}) in
     items, lib
   | Some Info.Entity.Type typ ->
     let items, lib =
-      deps (dict,generate_ideal core dict registry current) build
+      deps (dict,generate_ideal ctx dict registry current) build
         typ in
     let lib =
       let typ = Rename.typedef renamer typ in
@@ -309,13 +322,13 @@ let rec generate_ideal core dict registry current
     (items,lib)
 
 
-let rec generate_core core dict registry path (items, _ as build) =
+let rec generate_core ctx dict registry path (items, _ as build) =
   if items = S.empty then
     snd build
   else
     let p = S.choose items in
-    generate_core core dict registry path
-    @@ generate_ideal core dict registry path build p
+    generate_core ctx dict registry path
+    @@ generate_ideal ctx dict registry path build p
 
 let rec normalize_sigs acc = function
   | Module m :: q ->
@@ -386,6 +399,12 @@ let generate_subextension dict registry branch lib
   match ext.metadata.type' with
   | None -> lib
   | Some t ->
+    let ctx =
+      match t with
+      | "device" -> Device_extension
+      | "instance" -> Instance_extension
+      | _ -> Fmt.failwith "Unexpected extension type %S" t
+    in
     let vkext = "Vk__extension_sig" in
     let s = I.str (U.modtype ~par:L.[simple [vkext]] @@ renamer t) in
     let args = ["X", s] in
@@ -404,7 +423,7 @@ let generate_subextension dict registry branch lib
                         [Ast preambule])
         []  name in
     let lib = add [branch'] (Module ext_m) lib in
-    generate_core (fun x -> x) dict registry [branch';name]
+    generate_core ctx dict registry [branch';name]
       (items, lib)
 
 let generate_extensions dict registry extensions lib =
@@ -448,8 +467,7 @@ let generate dict (spec:Info.Structured_spec.spec) =
   let content =
     normalize
     @@ generate_extensions dict registry spec.extensions
-    @@ generate_core
-      ( fun path -> path @ [core] )
+    @@ generate_core Core
       dict registry [] (items, make ~sig':submodules [] vk) in
   { result = result_info dict registry; content;
     builtins = builtins dict}
