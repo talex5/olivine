@@ -1,3 +1,11 @@
+(* Work-around: some linkers ignore libraries that don't seem to be used.
+   Note: we don't call this function; it's just here so the linker knows we
+   want libvulkan.
+   https://github.com/ocaml/dune/issues/10461#issuecomment-2082149852 *)
+external ensure_vulkan_linked : unit -> unit = "caml_ensure_vulkan_linked"
+
+let () = ignore (Sys.opaque_identity (ensure_vulkan_linked) : unit -> unit)
+
 let unwrap = function
   | Some x -> x
   | None -> raise (Invalid_argument "unwrap None")

@@ -374,7 +374,7 @@ let loc = Location.none
 let mkforeign prefix name =
   let sig' = [ast @@
    I.item
-     [%str let libvulkan = Dl.dlopen ~filename:"libvulkan.so"
+     [%str let libvulkan = Dl.dlopen ?filename:None
                ~flags:Dl.[RTLD_NOW]
            let foreign name = Foreign.foreign ~from:libvulkan name]
      []

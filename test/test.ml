@@ -1,3 +1,4 @@
+module Vkc = Vk.Core
 module Vkt = Vk.Types
 module L = Info.Linguistic
 
@@ -98,6 +99,10 @@ let test_flag_bits2 () =
   let expected = mk_name ["vertex"; "input"] in
   Alcotest.check name "Remove prefix" expected (Aster.Bitset.field_name ctx constr)
 
+let test_link () =
+  match Vkc.enumerate_instance_version () with
+  | Ok (`Success, v) -> Fmt.epr "Linked Vulkan version %d" v
+  | Error e -> Fmt.failwith "%a" Vkt.Result.raw_pp e
 
 let () =
   let open Alcotest in
@@ -113,5 +118,8 @@ let () =
     ];
     "linguistic", [
       test_case "flag_bits2"     `Quick test_flag_bits2;
+    ];
+    "linking", [
+      test_case "test_link"      `Quick test_link;
     ];
   ]
