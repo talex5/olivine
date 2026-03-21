@@ -28,3 +28,8 @@ depends: [
   "alcotest" {with-test}
   "tsdl" {with-test}
   ]
+
+depexts: [
+  [ "libvulkan-dev" ] {os-family = "debian" | os-family = "ubuntu"}
+  [ "vulkan-loader-dev" ] {os-family = "arch" | os-family = "archlinux"}
+]
